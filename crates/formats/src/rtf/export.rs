@@ -471,6 +471,7 @@ impl Writer {
         out
     }
 
+    /// Write formatted blocks and advance body sections at top-level section breaks.
     fn blocks(&mut self, blocks: &[FBlock], intbl: bool, last_end: &str, out: &mut String, depth: usize) {
         let mut counter = model::ListCounter::default();
         let mut cur_list: Option<usize> = None;

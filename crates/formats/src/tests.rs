@@ -1031,6 +1031,7 @@ fn rtf_export_keeps_section_headers_and_footers() {
     assert_eq!(model::from_doc(&after).blocks.len(), model::from_doc(&before).blocks.len());
 }
 
+/// All six section-story destinations retain their text, formatting and header tables.
 #[test]
 fn rtf_export_keeps_all_header_footer_destinations_and_shared_resources() {
     let input = br"{\rtf1\ansi\deff0
@@ -1075,6 +1076,7 @@ fn rtf_export_keeps_all_header_footer_destinations_and_shared_resources() {
     assert_eq!(after.body.iter().filter_map(|b| b.as_para()).map(|p| p.plain_text()).collect::<Vec<_>>().join("|"), "TEST BODY");
 }
 
+/// Omitted headers remain linked, while explicit empty headers clear inherited content.
 #[test]
 fn rtf_export_distinguishes_linked_and_explicitly_empty_headers() {
     let input = br"{\rtf1\ansi\sectd
