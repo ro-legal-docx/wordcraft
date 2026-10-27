@@ -758,7 +758,7 @@ fn draw_line(p: &egui::Painter, [a, b]: [egui::Pos2; 2], style: BorderStyle, wid
             p.extend(egui::Shape::dashed_line(&[a, b], stroke, px * 4.0, px));
         }
         BorderStyle::DotDash => {
-            p.extend(egui::Shape::dashed_line_with_offset(&[a, b], stroke, &[px * 4.0, px], &[px * 2.0, px * 2.0], 0.0));
+            p.extend(egui::Shape::dashed_line_with_offset(&[a, b], stroke, &[px * 7.0, px * 3.0], &[px * 3.0, px * 3.0], 0.0));
         }
         BorderStyle::Wave => {
             let len = (b - a).length();
@@ -982,33 +982,40 @@ mod tests {
             .collect();
         assert!(texts.iter().any(|t| t.contains("(none)")), "empty-state hint shown");
     }
-    /// Painted previews retain equal dashed gaps and the distinct four-to-one small-gap ratio.
+    /// Painted paragraph previews use distinct document dash arrays at each preview stroke width.
     #[test]
-    fn border_preview_paragraph_dash_matches_gap() {
+    fn border_preview_paragraph_patterns_match_document_strokes() {
         let ctx = egui::Context::default();
-        let out = ctx.run_ui(egui::RawInput::default(), |ui| {
-            draw_line(ui.painter(), [egui::pos2(10.0, 20.0), egui::pos2(250.0, 20.0)], BorderStyle::Dashed, 1.0, egui::Color32::BLACK);
-        });
-        let segments: Vec<_> =
-            out.shapes.iter().filter_map(|s| if let egui::Shape::LineSegment { points, .. } = &s.shape { Some(*points) } else { None }).collect();
-        out.drop_without_applying_deltas();
-        assert!(segments.len() > 2);
-        let dash = segments[0][1].x - segments[0][0].x;
-        let gap = segments[1][0].x - segments[0][1].x;
-        assert!((dash - gap).abs() < 0.01, "the document's four-width dash and gap must match: {dash} / {gap}");
-
-        let small_out = ctx.run_ui(egui::RawInput::default(), |ui| {
-            draw_line(ui.painter(), [egui::pos2(10.0, 20.0), egui::pos2(250.0, 20.0)], BorderStyle::DashSmallGap, 1.0, egui::Color32::BLACK);
-        });
-        let small_segments: Vec<_> = small_out
-            .shapes
-            .iter()
-            .filter_map(|s| if let egui::Shape::LineSegment { points, .. } = &s.shape { Some(*points) } else { None })
-            .collect();
-        small_out.drop_without_applying_deltas();
-        assert!(small_segments.len() > 2);
-        let small_dash = small_segments[0][1].x - small_segments[0][0].x;
-        let small_gap = small_segments[1][0].x - small_segments[0][1].x;
-        assert!((small_dash - 4.0 * small_gap).abs() < 0.01, "small-gap dash/gap must have ratio 4:1: {small_dash} / {small_gap}");
+        for width in [0.5, 1.0, 3.0] {
+            for (kind, ratios) in [
+                (BorderStyle::Dashed, [4.0, 4.0, 4.0, 4.0]),
+                (BorderStyle::DashSmallGap, [4.0, 1.0, 4.0, 1.0]),
+                (BorderStyle::DotDash, [7.0, 3.0, 3.0, 3.0]),
+            ] {
+                let out = ctx.run_ui(egui::RawInput::default(), |ui| {
+                    draw_line(ui.painter(), [egui::pos2(10.0, 20.0), egui::pos2(250.0, 20.0)], kind, width, egui::Color32::BLACK);
+                });
+                let segments: Vec<_> = out
+                    .shapes
+                    .iter()
+                    .filter_map(|s| if let egui::Shape::LineSegment { points, stroke } = &s.shape { Some((*points, stroke.width)) } else { None })
+                    .collect();
+                out.drop_without_applying_deltas();
+                assert!(segments.len() > 2);
+                let actual = [
+                    segments[0].0[1].x - segments[0].0[0].x,
+                    segments[1].0[0].x - segments[0].0[1].x,
+                    segments[1].0[1].x - segments[1].0[0].x,
+                    segments[2].0[0].x - segments[1].0[1].x,
+                ];
+                for (actual, ratio) in actual.into_iter().zip(ratios) {
+                    assert!(
+                        (actual - ratio * segments[0].1).abs() < 0.01,
+                        "{kind:?}, width {width}: expected {}, got {actual}",
+                        ratio * segments[0].1
+                    );
+                }
+            }
+        }
     }
 }
