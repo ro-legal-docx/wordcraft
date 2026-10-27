@@ -665,10 +665,10 @@ pub fn export(doc: &Document) -> String {
     for (_, section) in doc.sections() {
         let mut stories = String::new();
         for (destination, id) in [
-            ("header", section.headers.default),
+            (if doc.settings.even_odd_headers { "headerr" } else { "header" }, section.headers.default),
             ("headerf", section.headers.first),
             ("headerl", section.headers.even),
-            ("footer", section.footers.default),
+            (if doc.settings.even_odd_headers { "footerr" } else { "footer" }, section.footers.default),
             ("footerf", section.footers.first),
             ("footerl", section.footers.even),
         ] {

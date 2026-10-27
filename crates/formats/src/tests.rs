@@ -1052,7 +1052,7 @@ fn rtf_export_keeps_all_header_footer_destinations_and_shared_resources() {
     before.settings.even_odd_headers = true;
     let encoded = crate::rtf::export(&before);
     assert!(encoded.contains("\\facingp"), "even-page stories need the document flag: {encoded}");
-    for destination in ["header", "headerf", "headerl", "footer", "footerf", "footerl"] {
+    for destination in ["headerr", "headerf", "headerl", "footerr", "footerf", "footerl"] {
         assert!(encoded.contains(&format!("{{\\{destination} ")), "{destination}: {encoded}");
     }
     let after = crate::rtf::import(encoded.as_bytes()).unwrap();
@@ -1095,4 +1095,46 @@ fn rtf_export_distinguishes_linked_and_explicitly_empty_headers() {
         after.parts.get(&empty).unwrap().blocks.iter().all(|b| b.as_para().is_some_and(|p| p.plain_text().is_empty())),
         "an empty destination clears the inherited story"
     );
+}
+
+/// Facing-page activation survives RTF round trips without enabling dormant even stories.
+#[test]
+fn rtf_roundtrip_keeps_even_odd_header_setting() {
+    for (control, enabled) in [("", false), ("\\facingp", true), ("\\facingp1", true), ("\\facingp0", false), ("\\facingp\\facingp0", false)] {
+        let input = format!(
+            "{{\\rtf1\\ansi{control}\\sectd{{\\header TEST DEFAULT HEADER\\par}}{{\\headerl TEST EVEN HEADER\\par}}\
+             {{\\footer TEST DEFAULT FOOTER\\par}}{{\\footerl TEST EVEN FOOTER\\par}}\\pard TEST BODY\\page TEST SECOND PAGE\\par}}"
+        );
+        let before = crate::rtf::import(input.as_bytes()).unwrap();
+        assert_eq!(before.settings.even_odd_headers, enabled, "import {control:?}");
+        let encoded = crate::rtf::export(&before);
+        assert_eq!(encoded.contains("\\facingp"), enabled, "export {control:?}");
+        for destination in if enabled { ["headerr", "footerr"] } else { ["header", "footer"] } {
+            assert!(encoded.contains(&format!("{{\\{destination} ")), "{encoded}");
+        }
+        let after = crate::rtf::import(encoded.as_bytes()).unwrap();
+        assert_eq!(after.settings.even_odd_headers, enabled, "reimport {control:?}");
+        for (id, expected) in [
+            (after.last_section.headers.default, "TEST DEFAULT HEADER"),
+            (after.last_section.headers.even, "TEST EVEN HEADER"),
+            (after.last_section.footers.default, "TEST DEFAULT FOOTER"),
+            (after.last_section.footers.even, "TEST EVEN FOOTER"),
+        ] {
+            let part = after.parts.get(&id.unwrap()).unwrap();
+            assert_eq!(part.blocks.iter().filter_map(|b| b.as_para()).map(|p| p.plain_text()).collect::<Vec<_>>().join("|"), expected);
+        }
+    }
+}
+
+/// Header/footer and skipped destinations cannot change the document-wide facing-page setting.
+#[test]
+fn rtf_facing_pages_ignore_story_local_and_skipped_controls() {
+    for (control, local, enabled) in [("", "\\facingp", false), ("\\facingp", "\\facingp0", true)] {
+        let input = format!(
+            "{{\\rtf1\\ansi{control}\\sectd{{\\header {local} TEST HEADER\\par}}\
+             {{\\footer {local} TEST FOOTER\\par}}{{\\*\\testskip {local}}}\\pard TEST BODY\\par}}"
+        );
+        let doc = crate::rtf::import(input.as_bytes()).unwrap();
+        assert_eq!(doc.settings.even_odd_headers, enabled, "{input}");
+    }
 }
