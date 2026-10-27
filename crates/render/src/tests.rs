@@ -1328,10 +1328,8 @@ fn border_dash_patterns_follow_word() {
     // Dark and light run lengths (points) along a 2 pt bottom border of `style`.
     let runs = |style: BorderStyle| {
         let mut p = wordcraft_doc::Paragraph::with_text("Bordered", Default::default());
-        p.props.borders = Some(Borders {
-            bottom: Some(Border { style, width: 2.0, color: Some(Rgb(0, 0, 0)), ..Border::single(2.0) }),
-            ..Borders::default()
-        });
+        p.props.borders =
+            Some(Borders { bottom: Some(Border { style, width: 2.0, color: Some(Rgb(0, 0, 0)), ..Border::single(2.0) }), ..Borders::default() });
         let mut d = Document::new();
         d.body = vec![wordcraft_doc::para_block(p)];
         let l = layout(&d, &mut LayoutCache::new(), &LayoutOptions::default());

@@ -752,7 +752,7 @@ fn draw_line(p: &egui::Painter, [a, b]: [egui::Pos2; 2], style: BorderStyle, wid
             p.extend(egui::Shape::dashed_line(&[a, b], stroke, px, px * 1.5));
         }
         BorderStyle::Dashed => {
-            p.extend(egui::Shape::dashed_line(&[a, b], stroke, px * 4.0, px * 2.0));
+            p.extend(egui::Shape::dashed_line(&[a, b], stroke, px * 4.0, px * 4.0));
         }
         BorderStyle::DashSmallGap => {
             p.extend(egui::Shape::dashed_line(&[a, b], stroke, px * 4.0, px));
@@ -981,5 +981,19 @@ mod tests {
             })
             .collect();
         assert!(texts.iter().any(|t| t.contains("(none)")), "empty-state hint shown");
+    }
+    #[test]
+    fn border_preview_paragraph_dash_matches_gap() {
+        let ctx = egui::Context::default();
+        let out = ctx.run_ui(egui::RawInput::default(), |ui| {
+            draw_line(ui.painter(), [egui::pos2(10.0, 20.0), egui::pos2(250.0, 20.0)], BorderStyle::Dashed, 1.0, egui::Color32::BLACK);
+        });
+        let segments: Vec<_> =
+            out.shapes.iter().filter_map(|s| if let egui::Shape::LineSegment { points, .. } = &s.shape { Some(*points) } else { None }).collect();
+        out.drop_without_applying_deltas();
+        assert!(segments.len() > 2);
+        let dash = segments[0][1].x - segments[0][0].x;
+        let gap = segments[1][0].x - segments[0][1].x;
+        assert!((dash - gap).abs() < 0.01, "the document's four-width dash and gap must match: {dash} / {gap}");
     }
 }

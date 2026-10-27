@@ -405,7 +405,9 @@ pub fn table_style_preview(ui: &mut Ui, style: Option<&TableStyleProps>, look: T
                 if let Some(e) = e.filter(Border::is_visible) {
                     let color = e.color.map_or(egui::Color32::BLACK, rgb);
                     let stroke = Stroke::new(e.width.clamp(0.5, 3.0) * 1.3, color);
-                    if matches!(e.style, BorderStyle::Dotted | BorderStyle::Dashed | BorderStyle::DashSmallGap | BorderStyle::DotDash) {
+                    if e.style == BorderStyle::DashSmallGap {
+                        painter.extend(egui::Shape::dashed_line(&[from, to], stroke, 3.0, 0.75));
+                    } else if matches!(e.style, BorderStyle::Dotted | BorderStyle::Dashed | BorderStyle::DotDash) {
                         painter.extend(egui::Shape::dashed_line(&[from, to], stroke, 3.0, 2.0));
                     } else {
                         painter.line_segment([from, to], stroke);
@@ -774,5 +776,39 @@ mod tests {
         let after = rules(h.state_mut());
         assert!(after.iter().all(|y| (y - top).abs() > 0.01), "the header row's top edge is gone: {after:?}");
         assert!(after.len() < before.len());
+    }
+    #[test]
+    fn border_preview_table_small_gap_is_distinct() {
+        let color = egui::Color32::from_rgb(13, 97, 181);
+        let paint = |kind| {
+            let mut style = TableStyleProps::default();
+            let border = Border { style: kind, width: 1.0, color: Some(Rgb(13, 97, 181)), space: 0.0 };
+            style.parts.borders = Some(Borders { top: Some(border), ..Default::default() });
+            let ctx = egui::Context::default();
+            let out = ctx.run_ui(egui::RawInput::default(), |ui| {
+                table_style_preview(ui, Some(&style), TableLook::default());
+            });
+            let segments = out
+                .shapes
+                .iter()
+                .filter_map(|s| {
+                    if let egui::Shape::LineSegment { points, stroke } = &s.shape
+                        && stroke.color == color
+                        && (points[1].y - points[0].y).abs() < 0.01
+                    {
+                        Some(*points)
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>();
+            out.drop_without_applying_deltas();
+            segments
+        };
+        let dashed = paint(BorderStyle::Dashed);
+        let small = paint(BorderStyle::DashSmallGap);
+        assert!(dashed.len() > 2 && small.len() > 2);
+        let gap = |s: &[[egui::Pos2; 2]]| s[1][0].x - s[0][1].x;
+        assert!(gap(&small) < gap(&dashed), "small gaps must look smaller in the live table preview");
     }
 }
