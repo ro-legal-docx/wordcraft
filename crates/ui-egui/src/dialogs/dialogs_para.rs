@@ -248,7 +248,7 @@ pub fn tabs(app: &mut WordApp, ui: &mut Ui, f: &mut TabsForm) -> bool {
                                     }
                                     // Alignment, picked in place.
                                     let mut a = t.align;
-                                    egui::ComboBox::from_id_salt("tab_align")
+                                    craft_ui::ComboBox::from_id_salt("tab_align")
                                         .width(86.0)
                                         .selected_text(tl!(crate::ruler_tabs::kind_label(a)))
                                         .show_ui(ui, |ui| {
@@ -269,7 +269,7 @@ pub fn tabs(app: &mut WordApp, ui: &mut Ui, f: &mut TabsForm) -> bool {
                                         .find(|(v, _, _)| *v == l)
                                         .map(|(_, _, fill)| if fill.is_empty() { tl!("None").to_string() } else { (*fill).to_string() })
                                         .unwrap_or_default();
-                                    egui::ComboBox::from_id_salt("tab_leader")
+                                    craft_ui::ComboBox::from_id_salt("tab_leader")
                                         .width(64.0)
                                         .selected_text(shown)
                                         .show_ui(ui, |ui| {
@@ -633,7 +633,7 @@ fn lines(ui: &mut Ui, id: &str, l: &mut LineForm, theme: &[Rgb], fill: Option<Rg
         ui.vertical(|ui| {
             ui.label(tl!("Style:"));
             let current = STYLES.iter().find(|(s, _)| *s == l.style).map(|(_, n)| *n).unwrap_or("Single");
-            egui::ComboBox::from_id_salt((id, "style")).selected_text(tl!(current)).width(120.0).show_ui(ui, |ui| {
+            craft_ui::ComboBox::from_id_salt((id, "style")).selected_text(tl!(current)).width(120.0).show_ui(ui, |ui| {
                 for (s, n) in STYLES {
                     ui.selectable_value(&mut l.style, s, tl!(n));
                 }
@@ -641,7 +641,7 @@ fn lines(ui: &mut Ui, id: &str, l: &mut LineForm, theme: &[Rgb], fill: Option<Rg
             ui.label(tl!("Color:"));
             color_menu(ui, theme, &mut l.color);
             ui.label(tl!("Width:"));
-            egui::ComboBox::from_id_salt((id, "width"))
+            craft_ui::ComboBox::from_id_salt((id, "width"))
                 .selected_text(crate::i18n::fmt(tl!("{n} pt"), &[("n", &l.width.to_string())]))
                 .width(120.0)
                 .show_ui(ui, |ui| {
@@ -982,6 +982,7 @@ mod tests {
             .collect();
         assert!(texts.iter().any(|t| t.contains("(none)")), "empty-state hint shown");
     }
+    /// Painted previews retain equal dashed gaps and the distinct four-to-one small-gap ratio.
     #[test]
     fn border_preview_paragraph_dash_matches_gap() {
         let ctx = egui::Context::default();
@@ -995,5 +996,19 @@ mod tests {
         let dash = segments[0][1].x - segments[0][0].x;
         let gap = segments[1][0].x - segments[0][1].x;
         assert!((dash - gap).abs() < 0.01, "the document's four-width dash and gap must match: {dash} / {gap}");
+
+        let small_out = ctx.run_ui(egui::RawInput::default(), |ui| {
+            draw_line(ui.painter(), [egui::pos2(10.0, 20.0), egui::pos2(250.0, 20.0)], BorderStyle::DashSmallGap, 1.0, egui::Color32::BLACK);
+        });
+        let small_segments: Vec<_> = small_out
+            .shapes
+            .iter()
+            .filter_map(|s| if let egui::Shape::LineSegment { points, .. } = &s.shape { Some(*points) } else { None })
+            .collect();
+        small_out.drop_without_applying_deltas();
+        assert!(small_segments.len() > 2);
+        let small_dash = small_segments[0][1].x - small_segments[0][0].x;
+        let small_gap = small_segments[1][0].x - small_segments[0][1].x;
+        assert!((small_dash - 4.0 * small_gap).abs() < 0.01, "small-gap dash/gap must have ratio 4:1: {small_dash} / {small_gap}");
     }
 }

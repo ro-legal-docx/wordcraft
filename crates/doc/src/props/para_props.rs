@@ -112,6 +112,7 @@ pub enum BorderStyle {
 }
 
 impl BorderStyle {
+    /// The OOXML border token; small-gap dashes keep their distinct `dashSmallGap` value.
     pub fn ooxml(self) -> &'static str {
         match self {
             BorderStyle::None => "nil",
@@ -126,6 +127,7 @@ impl BorderStyle {
             BorderStyle::Wave => "wave",
         }
     }
+    /// Read an OOXML border token, using a single line for unrecognized styles.
     pub fn from_ooxml(s: &str) -> BorderStyle {
         match s {
             "nil" | "none" => BorderStyle::None,
