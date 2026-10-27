@@ -1,3 +1,4 @@
+use super::numbers::{bookmark_para, para_numbers, ref_number};
 use super::properties::{
     bookmark_text, count_text, date_picture, doc_property, doc_property_arg, new_property_value, set_summary_property, summary_property, text_result,
 };
@@ -178,6 +179,8 @@ pub fn update_fields_in(s: &mut Session, all: bool) -> Result<(), CmdError> {
     // The document properties as the fields read and set them (`SUBJECT "New subject"`): a field
     // after one that sets a property shows the new value.
     let mut core = s.doc.core.clone();
+    // Build the body numbering once, only when a numeric REF needs it.
+    let mut numbers = None;
     for (story, path) in stories.into_iter().flat_map(|st| s.doc.para_paths(st).into_iter().map(move |p| (st, p))).collect::<Vec<_>>() {
         let Some(p) = s.doc.para(story, &path) else { continue };
         if !p.objects.iter().any(|o| matches!(o, InlineObject::Field { .. })) {
@@ -210,7 +213,18 @@ pub fn update_fields_in(s: &mut Session, all: bool) -> Result<(), CmdError> {
                     let f = FieldCode::parse(instr);
                     let target = f.args.first().map(|s| s.split('\\').next().unwrap_or("").trim_matches('"')).unwrap_or("");
                     let r = if name == "REF" {
-                        if !has_switch(instr, 'p') { bookmark_text(&s.doc, target) } else { None }
+                        if has_switch(instr, 'p') {
+                            None
+                        } else if let Some(sw) = ['w', 'r', 'n'].into_iter().find(|c| has_switch(instr, *c)) {
+                            if has_switch(instr, 'd') || has_switch(instr, 't') {
+                                continue; // Preserve cached results for unsupported delimiter/text switches.
+                            }
+                            let numbers = numbers.get_or_insert_with(|| para_numbers(&s.doc));
+                            let from = (story == StoryRef::Body).then_some(&path);
+                            bookmark_para(&s.doc, target).and_then(|tp| ref_number(numbers, &tp, from, sw))
+                        } else {
+                            bookmark_text(&s.doc, target)
+                        }
                     } else if !has_switch(instr, 'p') {
                         pages.get(target).map(|(num, page_fmt)| {
                             let fmt = wordcraft_layout::fields::format_switch(instr).unwrap_or(*page_fmt);
