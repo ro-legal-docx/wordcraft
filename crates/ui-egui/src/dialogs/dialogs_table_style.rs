@@ -405,7 +405,7 @@ pub fn table_style_preview(ui: &mut Ui, style: Option<&TableStyleProps>, look: T
                 if let Some(e) = e.filter(Border::is_visible) {
                     let color = e.color.map_or(egui::Color32::BLACK, rgb);
                     let stroke = Stroke::new(e.width.clamp(0.5, 3.0) * 1.3, color);
-                    if matches!(e.style, BorderStyle::Dotted | BorderStyle::Dashed | BorderStyle::DotDash) {
+                    if matches!(e.style, BorderStyle::Dotted | BorderStyle::Dashed | BorderStyle::DashSmallGap | BorderStyle::DotDash) {
                         painter.extend(egui::Shape::dashed_line(&[from, to], stroke, 3.0, 2.0));
                     } else {
                         painter.line_segment([from, to], stroke);
@@ -607,10 +607,11 @@ pub fn body(app: &mut WordApp, ui: &mut Ui, f: Form) -> bool {
 }
 
 /// The border styles the pen offers (the Borders and Shading dialog's list).
-const LINE_STYLES: [(BorderStyle, &str); 8] = [
+const LINE_STYLES: [(BorderStyle, &str); 9] = [
     (BorderStyle::Single, "Single"),
     (BorderStyle::Dotted, "Dotted"),
     (BorderStyle::Dashed, "Dashed"),
+    (BorderStyle::DashSmallGap, "Dashed, small gaps"),
     (BorderStyle::DotDash, "Dot dash"),
     (BorderStyle::Double, "Double"),
     (BorderStyle::Triple, "Triple"),

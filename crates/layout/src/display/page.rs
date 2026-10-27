@@ -318,6 +318,7 @@ fn border_stroke(s: BorderStyle) -> Stroke {
     match s {
         BorderStyle::Dotted => Stroke::BorderDotted,
         BorderStyle::Dashed => Stroke::BorderDashed,
+        BorderStyle::DashSmallGap => Stroke::BorderDashSmallGap,
         BorderStyle::DotDash => Stroke::BorderDotDash,
         BorderStyle::Double => Stroke::Double,
         BorderStyle::Triple => Stroke::Triple,

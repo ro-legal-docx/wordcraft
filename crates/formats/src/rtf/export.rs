@@ -143,6 +143,7 @@ fn rtf_border_style(s: wordcraft_doc::props::BorderStyle) -> &'static str {
         BorderStyle::Double => "\\brdrdb",
         BorderStyle::Dotted => "\\brdrdot",
         BorderStyle::Dashed => "\\brdrdash",
+        BorderStyle::DashSmallGap => "\\brdrdashsm",
         BorderStyle::Thick => "\\brdrth",
         BorderStyle::Triple => "\\brdrtriple",
         BorderStyle::DotDash => "\\brdrdashd",

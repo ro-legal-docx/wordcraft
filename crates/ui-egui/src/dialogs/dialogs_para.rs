@@ -378,10 +378,11 @@ const LEFT: usize = 2;
 const RIGHT: usize = 3;
 const BETWEEN: usize = 4;
 
-const STYLES: [(BorderStyle, &str); 8] = [
+const STYLES: [(BorderStyle, &str); 9] = [
     (BorderStyle::Single, "Single"),
     (BorderStyle::Dotted, "Dotted"),
     (BorderStyle::Dashed, "Dashed"),
+    (BorderStyle::DashSmallGap, "Dashed, small gaps"),
     (BorderStyle::DotDash, "Dot dash"),
     (BorderStyle::Double, "Double"),
     (BorderStyle::Triple, "Triple"),
@@ -752,6 +753,9 @@ fn draw_line(p: &egui::Painter, [a, b]: [egui::Pos2; 2], style: BorderStyle, wid
         }
         BorderStyle::Dashed => {
             p.extend(egui::Shape::dashed_line(&[a, b], stroke, px * 4.0, px * 2.0));
+        }
+        BorderStyle::DashSmallGap => {
+            p.extend(egui::Shape::dashed_line(&[a, b], stroke, px * 4.0, px));
         }
         BorderStyle::DotDash => {
             p.extend(egui::Shape::dashed_line_with_offset(&[a, b], stroke, &[px * 4.0, px], &[px * 2.0, px * 2.0], 0.0));
