@@ -313,3 +313,30 @@ fn ambiguous_numeric_label_join_keeps_the_cached_full_context() {
     let got: Vec<_> = fields(&s).into_iter().map(|(_, s)| s).collect();
     assert_eq!(got, ["1.1.1", "1"]);
 }
+
+/// Reusing the lookup keeps the first body bookmark even with duplicate names and many updates.
+#[test]
+fn repeated_numeric_refs_keep_the_first_body_bookmark() {
+    use wordcraft_doc::{PartKind, Path};
+    let mut body = [
+        para(Some((4, 0)), &marked("_Duplicate", 80, "First synthetic target")),
+        para(Some((4, 0)), &marked("_Duplicate", 81, "Second synthetic target")),
+    ]
+    .concat();
+    for _ in 0..64 {
+        body.push_str(&para(None, &field(r"REF _Duplicate \w \h", "STALE")));
+    }
+    body.push_str(&para(None, &field(r"REF _Duplicate \h", "STALE")));
+    let mut s = open(&body);
+    assert_eq!(s.doc.bookmarks().iter().filter(|(name, _)| name == "_Duplicate").count(), 2);
+    // A same-named bookmark outside the body cannot replace the body target.
+    let header = open(&para(None, &marked("_Duplicate", 82, "Header synthetic target"))).doc.body[0].clone();
+    let id = s.doc.add_part(PartKind::Header, vec![header]);
+    s.doc.last_section.headers.default = Some(id);
+    s.run("references.updateFields", &json!({"all": true})).unwrap();
+    let got = fields(&s);
+    assert_eq!(got.len(), 65);
+    assert!(got[..64].iter().all(|(_, value)| value == "1"));
+    assert_eq!(got[64].1, "First synthetic target");
+    assert_eq!(s.doc.bookmarks().iter().find(|(name, _)| name == "_Duplicate").unwrap().1.path, Path::top(0));
+}

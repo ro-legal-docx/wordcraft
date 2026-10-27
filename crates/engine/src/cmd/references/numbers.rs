@@ -144,7 +144,13 @@ pub(super) fn ref_number(numbers: &std::collections::HashMap<Path, ParaNumber>, 
     Some(out)
 }
 
-/// The body paragraph the bookmark `name` starts in.
-pub(super) fn bookmark_para(doc: &wordcraft_doc::Document, name: &str) -> Option<Path> {
-    doc.bookmarks().into_iter().find(|(n, p)| n == name && p.story == StoryRef::Body).map(|(_, p)| p.path)
+/// Index the first body paragraph for each bookmark name, retaining document-order lookup semantics.
+pub(super) fn body_bookmark_paths(doc: &wordcraft_doc::Document) -> std::collections::HashMap<String, Path> {
+    let mut paths = std::collections::HashMap::new();
+    for (name, pos) in doc.bookmarks() {
+        if pos.story == StoryRef::Body {
+            paths.entry(name).or_insert(pos.path);
+        }
+    }
+    paths
 }
