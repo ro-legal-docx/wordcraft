@@ -8,7 +8,15 @@
 > **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-18 · **Change:** trivial (English dialects in proofing, #1281; previously trivial: triple borders draw three lines, #1740; previously trivial: progress log: double-clicking a later page's footer no longer scrolls up, #2103; previously trivial: long navigation headings wrap onto further lines within the pane, #3015; previously trivial: clearing a no-match font query keeps the recent heading visible, #2068; previously trivial: a word after a slash wraps whole, like Word, #2963; previously trivial: RTF export writes sections (gap 19); previously trivial: ODT export writes sections (gap 19); previously trivial: progress log: pasted blockquotes are indented paragraphs, #1270; previously trivial: progress log: print-area strings translated in every catalog; previously trivial: progress log: comments readable in the dark theme, #2045; previously trivial: progress log: ODT sections, #1379; previously trivial: progress log: table deletes, Change Case and Unlink Fields respect Track Changes and locked content controls, #1329; previously trivial: progress log: rounded rectangle corners, #1476; previously trivial: progress log: Save As type list, #1399; previously trivial: progress log: privacy options on save, #1062; previously trivial: progress log: equation pictures in theme colours on Windows, #1002; previously trivial: symbol fonts, #776; previously trivial: the save prompt answers from the keyboard, #861; previously trivial: table column and row markers on the rulers, #700; previously trivial: table borders and the resize handle drag on the page, #217; previously trivial: formatting revisions landed, #41; previously trivial: Draw tab ink, #307, and Draw Table and Eraser, #303, landed: catalog 402/434; previously minor: readiness table with hours per audience; full number back to the additive weighted sum, 60%; mainstream and essentials numbers added; alpha gate checked; previously major: full re-measure against Word for Mac 16.113.4; restructured to the craftrules progress-docs standard) · **Target:** Microsoft Word (Microsoft 365) for Mac 16.113.4
 > **Printing update:** 2026-10-12 · direct desktop printing through craft-print; details below.
 
-### List levels inherited from paragraph styles (#4287 follow-up)
+WordCraft aims for complete parity with Microsoft Word, then goes further on speed, openness and
+agent control. This page is the summary; the assessment is
+[`docs/target-app-parity.md`](docs/target-app-parity.md), the work list is
+[`docs/gaps.md`](docs/gaps.md), and milestones and the current focus are in
+[`docs/roadmap.md`](docs/roadmap.md).
+
+> **Comment command update:** 2026-10-14 · malformed explicit IDs rejected; synthetic refusal, undo/redo and DOCX save/reopen checks (#1690 finding 3). Readiness estimates unchanged.
+
+## List levels inherited from paragraph styles (#4287 follow-up)
 
 Change List Level, Indent and Outdent resolve the effective list through style inheritance.
 A real level change sets a paragraph override for that same list and clears direct physical
@@ -17,14 +25,6 @@ cases remain no-ops. This adapts #4322's direct-indent fix to the current module
 extends it to style-based lists. Synthetic controls cover undo/redo, DOCX save/reopen and ten
 original one-page CLI cases. Their PDF renders match separately authored reference documents;
 this is not native Microsoft Word or Windows GUI acceptance. Readiness estimates are unchanged.
-
-WordCraft aims for complete parity with Microsoft Word, then goes further on speed, openness and
-agent control. This page is the summary; the assessment is
-[`docs/target-app-parity.md`](docs/target-app-parity.md), the work list is
-[`docs/gaps.md`](docs/gaps.md), and milestones and the current focus are in
-[`docs/roadmap.md`](docs/roadmap.md).
-
-> **Comment command update:** 2026-10-14 · malformed explicit IDs rejected; synthetic refusal, undo/redo and DOCX save/reopen checks (#1690 finding 3). Readiness estimates unchanged.
 
 ## Headline numbers (2026-10-10)
 

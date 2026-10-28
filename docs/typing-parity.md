@@ -2,7 +2,13 @@
 
 > **Last reviewed:** 2026-10-11 · **Last updated:** 2026-10-28 · **Change:** minor (style-inherited list levels, direct-indent resets and synthetic DOCX save/reopen checks) · **Target:** Microsoft Word (Microsoft 365) for Mac 16.113.4
 
-### List levels inherited from paragraph styles (#4287 follow-up)
+What Word does when you type, observed black-box (same keystrokes typed into Word and
+WordCraft, results read back paragraph by paragraph) and pinned by tests in
+`crates/engine/src/tests/typing.rs`. When typing behaviour changes, change it here and in the
+tests together. Line breaking and pagination are in [`layout-parity.md`](layout-parity.md); the
+overall picture is in [`target-app-parity.md`](target-app-parity.md).
+
+## List levels inherited from paragraph styles (#4287 follow-up)
 
 Change List Level, Indent and Outdent resolve the effective list through style inheritance.
 A real level change sets a paragraph override for that same list and clears direct physical
@@ -11,12 +17,6 @@ cases remain no-ops. This adapts #4322's direct-indent fix to the current module
 extends it to style-based lists. Synthetic controls cover undo/redo, DOCX save/reopen and ten
 original one-page CLI cases. Their PDF renders match separately authored reference documents;
 this is not native Microsoft Word or Windows GUI acceptance. Readiness estimates are unchanged.
-
-What Word does when you type, observed black-box (same keystrokes typed into Word and
-WordCraft, results read back paragraph by paragraph) and pinned by tests in
-`crates/engine/src/tests/typing.rs`. When typing behaviour changes, change it here and in the
-tests together. Line breaking and pagination are in [`layout-parity.md`](layout-parity.md); the
-overall picture is in [`target-app-parity.md`](target-app-parity.md).
 
 ## Highlight shortcut (#4085)
 
