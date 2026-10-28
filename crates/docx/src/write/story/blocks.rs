@@ -26,6 +26,7 @@ impl Writer<'_> {
         self.blocks_inner(w, bl, rels, false, 0, false);
     }
 
+    /// Serialize blocks and balance their ranges, optionally adding a paragraph after a final table.
     fn blocks_inner(&mut self, w: &mut W, bl: &Blocks, rels: &mut PartRels, top: bool, depth: usize, trailing_after_table: bool) {
         if depth > MAX_DEPTH {
             w.raw("<w:p/>");
