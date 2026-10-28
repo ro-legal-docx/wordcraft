@@ -742,6 +742,12 @@ impl AffixDict {
         self.check_excluding(w, self.forbidden | self.no_suggest)
     }
 
+    /// Whether this casing/form is listed even when FORBIDDENWORD or NOSUGGEST excludes it.
+    /// Only guards fallback paths; it must never be used as a correctness check.
+    pub(crate) fn is_listed_even_if_excluded(&self, w: &str) -> bool {
+        self.check_excluding(w, 0)
+    }
+
     fn check_excluding(&self, w: &str, excluded: u128) -> bool {
         if self.contains_excluding(w, excluded) {
             return true;
@@ -1116,6 +1122,17 @@ pub(crate) mod tests {
             let ordinary = AffixDict::from_hunspell(aff, "2\nmixCase\nhidden/N\n", &[]).unwrap();
             assert!(suggest(&ordinary, "MIXCASX", 8).contains(&"MIXCASE".into()));
         }
+    }
+
+    /// Fallback callers can distinguish explicitly excluded words from unknown compounds.
+    #[test]
+    fn excluded_listing_includes_case_and_affixed_forms() {
+        let d = AffixDict::from_hunspell("NOSUGGEST N\nFORBIDDENWORD F\nSFX A Y 1\nSFX A 0 s .\n", "2\nsecret/NA\nbanned/FA\n", &[]).unwrap();
+        for word in ["secret", "Secrets", "banned", "BANNEDS"] {
+            assert!(d.is_listed_even_if_excluded(word), "{word}");
+            assert!(!d.can_suggest(word), "{word}");
+        }
+        assert!(!d.is_listed_even_if_excluded("unknown"));
     }
 
     #[test]

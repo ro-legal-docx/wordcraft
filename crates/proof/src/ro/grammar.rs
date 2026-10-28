@@ -78,6 +78,14 @@ fn repeated_words(text: &str, ws: &[(usize, usize)], v: &mut Vec<Issue>) {
     }
 }
 
+/// A common typed stand-in for Romanian low opening quotes, without changing the source.
+fn ascii_opening_quote(text: &str, at: usize) -> bool {
+    let before = text.get(..at).and_then(|s| s.chars().next_back());
+    text.get(at..).is_some_and(|s| s.starts_with(",,"))
+        && before.is_none_or(|c| c.is_whitespace() || matches!(c, '(' | '[' | '—' | '–'))
+        && text.get(at.saturating_add(2)..).and_then(|s| s.chars().next()).is_some_and(char::is_alphanumeric)
+}
+
 fn spaces(text: &str, v: &mut Vec<Issue>) {
     for (i, c) in text.char_indices() {
         if c != ' ' {
@@ -88,7 +96,7 @@ fn spaces(text: &str, v: &mut Vec<Issue>) {
         let Some(p) = it.next() else { continue };
         let after = it.next();
         let flag = match p {
-            ',' => true,
+            ',' => !ascii_opening_quote(text, i.saturating_add(1)),
             // `;)` and `;-)` are emoticons.
             ';' => !matches!(after, Some(')' | '(' | '-' | 'P' | 'D')),
             // ` ...` is an ellipsis, ` .5` a number.
@@ -126,6 +134,9 @@ fn sentence_capitals(text: &str, ws: &[(usize, usize)], capital_first: bool, v: 
 fn doubled_punctuation(text: &str, v: &mut Vec<Issue>) {
     for pat in [",,", "..", ";;", "::", "??", "!!"] {
         for (i, _) in text.match_indices(pat) {
+            if pat == ",," && ascii_opening_quote(text, i) {
+                continue;
+            }
             if pat == ".." && text.get(i + 2..).is_some_and(|r| r.starts_with('.')) {
                 continue; // ellipsis
             }
@@ -157,6 +168,16 @@ pub fn check_with(text: &str, capital_first: bool) -> Vec<Issue> {
 
 #[cfg(test)]
 mod tests {
+    /// ASCII low opening quotes are not duplicate commas or spaces-before-punctuation errors.
+    #[test]
+    fn ascii_opening_quotes_are_not_rewritten_as_commas() {
+        for text in [r#"El a spus ,,Vin mâine"."#, r#",,Citat"."#, r#"Exemplu —,,Citat"."#, r#"Exemplu [,,Citat"]."#] {
+            assert!(check(text).is_empty(), "{text}: {:?}", check(text));
+        }
+        assert!(check("Text,, alt text.").iter().any(|i| i.message == "Punctuație dublă"));
+        assert!(check("Text , alt text.").iter().any(|i| i.message == "Spațiu înaintea semnului de punctuație"));
+    }
+
     /// Office abbreviations and contextual wording must not receive speculative replacements.
     #[test]
     fn office_wording_does_not_receive_contextual_grammar_guesses() {

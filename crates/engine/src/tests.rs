@@ -8057,6 +8057,9 @@ const PORTUGUESE_TEST_AFF: &str =
     "SET UTF-8\nFLAG UTF-8\nFORBIDDENWORD F\nTRY aeiousrntmdlcpvgqbzfhjxçãõáéíóúâêô\nMAP 2\nMAP aáã\nMAP eé\nREP 1\nREP seje seja\n";
 const PORTUGUESE_TEST_DIC: &str = "11\nsaudade\ncoração\ne\nele\ndisse\nnão\né\nque\nseja\nfrequencia/F\nmuito\n";
 
+const ROMANIAN_TEST_AFF: &str = "SET UTF-8\nTRY abcdefghijklmnoprsștțuvzăâî\nMAP 3\nMAP aăâ\nMAP sș\nMAP tț\n";
+const ROMANIAN_TEST_DIC: &str = "6\ndocumentul\neste\natașat\ncererea\nmare\nexemplu\n";
+
 /// #1063: File › Options › Proofing › Dictionaries folder. A folder of Hunspell files is saved,
 /// searched first and reported per language; a missing folder or a relative path is refused and
 /// changes nothing. The folder holds the same test dictionaries the other tests install, so tests
@@ -8078,6 +8081,7 @@ fn dictionaries_folder_option_is_saved_searched_and_reported() {
         // would otherwise force a reload that finds no cs_CZ here and empties it mid-test. Same
         // fixture content either way keeps such a race harmless, as it already does for Polish.
         ("cs_CZ", czech_test_dict::AFF, czech_test_dict::DIC),
+        ("ro_RO", ROMANIAN_TEST_AFF, ROMANIAN_TEST_DIC),
     ] {
         std::fs::write(dir.join(format!("{name}.aff")), aff).unwrap();
         std::fs::write(dir.join(format!("{name}.dic")), dic).unwrap();
@@ -11090,9 +11094,7 @@ fn scale_font_sizes_reaches_char_table_and_cs_sizes_and_unset_default() {
 /// Romanian spelling, suggestions and basic grammar work through the public review commands.
 #[test]
 fn romanian_office_proofing_commands() {
-    let aff = "SET UTF-8\nTRY abcdefghijklmnoprsștțuvzăâî\nMAP 3\nMAP aăâ\nMAP sș\nMAP tț\n";
-    let dic = "6\ndocumentul\neste\natașat\ncererea\nmare\nexemplu\n";
-    wordcraft_proof::ro::install_dictionary(aff, dic).unwrap();
+    wordcraft_proof::ro::install_dictionary(ROMANIAN_TEST_AFF, ROMANIAN_TEST_DIC).unwrap();
     let mut s = s();
     run(&mut s, "document.setText", json!({"text":"Documentul este atasat. Cererea este mare mare."}));
     run(&mut s, "select.all", json!({}));

@@ -139,7 +139,7 @@ pub fn is_correct_with(d: &AffixDict, word: &str) -> bool {
         return true;
     }
     // `într-o`, `s-a`, `dă-mi-l`, `nord-est`: every part is a word (or a one-letter clitic).
-    w.contains('-') && w.split('-').all(|p| p.chars().count() <= 1 || known(d, p))
+    w.contains('-') && !d.is_listed_even_if_excluded(&w) && w.split('-').all(|p| p.chars().count() <= 1 || known(d, p))
 }
 
 /// Is one word in the dictionary or the user dictionary?

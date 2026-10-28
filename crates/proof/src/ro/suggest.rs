@@ -70,7 +70,9 @@ struct Collector<'a> {
 /// A phrase is eligible only if every word (or hyphenated part) may be suggested.
 fn can_suggest_phrase(d: &AffixDict, text: &str) -> bool {
     text.split(' ').all(|word| {
-        !word.is_empty() && (d.can_suggest(word) || (word.contains('-') && word.split('-').all(|part| !part.is_empty() && d.can_suggest(part))))
+        !word.is_empty()
+            && (d.can_suggest(word)
+                || (word.contains('-') && !d.is_listed_even_if_excluded(word) && word.split('-').all(|part| !part.is_empty() && d.can_suggest(part))))
     })
 }
 
@@ -425,6 +427,24 @@ fn scan(col: &mut Collector, chars: &[char]) {
 
 #[cfg(test)]
 mod tests {
+    /// A whole-compound exclusion must not be bypassed by checking its allowed parts.
+    #[test]
+    fn romanian_compound_exclusions_are_not_bypassed() {
+        let d = crate::affix::AffixDict::from_hunspell(
+            "SET UTF-8\nNOSUGGEST N\nFORBIDDENWORD F\nMAP 1\nMAP aă\nSFX A Y 1\nSFX A 0 uri .\n",
+            "4\ncasă\ncaz/A\ncasă-casă/N\ncasă-caz/F\n",
+            &[],
+        )
+        .unwrap();
+        assert!(crate::ro::is_correct_with(&d, "casă-casă"));
+        assert!(!crate::ro::is_correct_with(&d, "casă-caz"));
+        assert!(crate::ro::is_correct_with(&d, "caz-caz"));
+        for input in ["casa-casă", "casă-casax", "casa-caz", "CASA-CASĂ"] {
+            let found = suggest_in(&d, input, 12);
+            assert!(found.iter().all(|w| !["casă-casă", "casă-caz"].contains(&w.to_lowercase().as_str())), "{input}: {found:?}");
+        }
+    }
+
     /// The active dictionary controls words excluded from suggestions, including inflections.
     #[test]
     fn romanian_suggestions_respect_nosuggest() {

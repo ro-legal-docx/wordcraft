@@ -149,7 +149,9 @@ opened plain text use `ro-RO`. Existing document languages and a saved default t
 
 F7, suggestion application and the user dictionary work in Romanian. Old cedilla `ş`/`ţ`
 are recognized as comma-below `ș`/`ț` for lookup only. Checking does not normalize or replace
-the document text. Suggestions are choices, not automatic rewrites.
+the document text. Suggestions are choices, not automatic rewrites. Typed low opening quotes such
+as `,,citat"` are not treated as duplicate commas or spaces-before-punctuation errors.
+Explicit whole-compound exclusions cannot be bypassed by checking the parts separately.
 
 This is spelling plus basic punctuation/capitalization checking, not full grammatical or
 legal review. A spelling dictionary accepts some ambiguous forms: for example, the tested
