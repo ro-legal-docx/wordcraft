@@ -1,0 +1,54 @@
+name: Codex PR 4593 verification
+run-name: WordCraft PR 4593 at c71afecf
+
+on:
+  push:
+    branches: [codex/ci-wordcraft-4593-20261028-064439z]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    if: github.repository == 'ro-legal-docx/wordcraft'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CARGO_TERM_COLOR: always
+      CARGO_INCREMENTAL: 0
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
+      CARGO_BUILD_JOBS: "2"
+    steps:
+      - name: Check out the reviewed PR source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: c71afecf599f80af8f6aafe17efb786a07fd8ca4
+          persist-credentials: false
+          clean: false
+      - name: Verify source identity
+        run: |
+          test "$(git rev-parse HEAD)" = c71afecf599f80af8f6aafe17efb786a07fd8ca4
+          printf 'Source under test: `c71afecf599f80af8f6aafe17efb786a07fd8ca4`\n' >> "$GITHUB_STEP_SUMMARY"
+          printf 'Scope: workspace formatting, assets/layers, doc/formats Clippy, unit tests and wasm compilation.\n' >> "$GITHUB_STEP_SUMMARY"
+          printf 'Full-workspace runtime tests and SonarCloud analysis are outside this scoped run.\n' >> "$GITHUB_STEP_SUMMARY"
+      - name: Install the validated Rust toolchain
+        run: |
+          rustup toolchain install 1.95.0 --profile minimal --no-self-update --component clippy --component rustfmt --target wasm32-unknown-unknown
+          rustup default 1.95.0
+          rustc --version
+      - name: Workspace formatting
+        run: cargo fmt --all -- --check
+      - name: Doc and formats Clippy
+        run: cargo clippy -p wordcraft-doc -p wordcraft-formats --all-targets --locked -- -D warnings
+      - name: Doc and formats unit tests
+        run: cargo test -p wordcraft-doc -p wordcraft-formats --lib --locked
+      - name: Asset attribution
+        run: cargo xtask assets
+      - name: Dependency layering
+        run: cargo xtask layers
+      - name: Doc and formats wasm compilation
+        run: cargo check -p wordcraft-doc -p wordcraft-formats --target wasm32-unknown-unknown --locked
+      - name: Lockfile unchanged
+        run: git diff --exit-code -- Cargo.lock
