@@ -134,17 +134,18 @@ pub fn is_correct_with(d: &AffixDict, word: &str) -> bool {
     if !w.chars().any(is_latin_letter) {
         return true; // other scripts: no dictionary
     }
-    let w = comma_below(w);
-    if known(d, &w) {
+    if known(d, w) {
         return true;
     }
     // `într-o`, `s-a`, `dă-mi-l`, `nord-est`: every part is a word (or a one-letter clitic).
-    w.contains('-') && !d.excludes_spelling(&w) && w.split('-').all(|p| p.chars().count() <= 1 || known(d, p))
+    w.contains('-') && !d.excludes_spelling(&comma_below(w)) && w.split('-').all(|p| p.chars().count() <= 1 || known(d, p))
 }
 
-/// Is one word in the dictionary or the user dictionary?
+/// Is one word in the dictionary or the user dictionary? Keep the original spelling for
+/// Add to Dictionary / Ignore All, including each part of a hyphenated word.
 fn known(d: &AffixDict, w: &str) -> bool {
-    d.check(w) || crate::in_user_dictionary(&w.to_lowercase())
+    let normalized = comma_below(w);
+    d.check(&normalized) || crate::in_user_dictionary(&w.to_lowercase()) || (normalized != w && crate::in_user_dictionary(&normalized.to_lowercase()))
 }
 
 #[cfg(test)]
@@ -278,6 +279,25 @@ mod tests {
         assert!(!suggest("cîine", 8).iter().any(|s| s.contains('-')), "{:?}", suggest("cîine", 8));
         assert_eq!(suggest("intrun", 3).first().map(String::as_str), Some("într-un"));
         assert!(suggest("Bucuresti", 5).iter().any(|s| s == "București"));
+    }
+
+    #[test]
+    fn user_dictionary_keeps_legacy_cedilla_spellings() {
+        let d = AffixDict::from_hunspell(test_dict::AFF, test_dict::DIC, &[]).expect("synthetic dictionary");
+        let added = "zxqşţcuvânt";
+        let ignored = "zxqşţignorat";
+        for w in [added, ignored] {
+            assert!(!is_correct_with(&d, w), "unknown before adding: {w}");
+            assert!(!is_correct_with(&d, &format!("{w}-casă")), "unknown compound: {w}");
+        }
+        crate::add_word("ZxqŞŢcuvânt");
+        crate::ignore_word("ZxqŞŢignorat");
+        for w in [added, ignored] {
+            assert!(is_correct_with(&d, w), "original cedilla entry: {w}");
+            assert!(is_correct_with(&d, &format!("{w}-casă")), "cedilla compound part: {w}");
+        }
+        crate::add_word("zxqșțmodern");
+        assert!(is_correct_with(&d, "zxqşţmodern"), "modern entry also accepts a legacy spelling");
     }
 
     #[test]
