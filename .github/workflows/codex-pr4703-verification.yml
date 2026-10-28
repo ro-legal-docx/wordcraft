@@ -1,0 +1,86 @@
+name: Codex PR 4703 cross-platform verification
+run-name: WordCraft PR 4703 at 7ce6dd45
+on:
+  push:
+    branches: [codex/ci-wordcraft-4703-20261028-111008z]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    if: github.repository == 'ro-legal-docx/wordcraft'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    env:
+      CARGO_TERM_COLOR: always
+      CARGO_INCREMENTAL: "0"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
+      CARGO_BUILD_JOBS: "2"
+      PYTHONUTF8: "1"
+      WORDCRAFT_REGION: ro-RO
+      PROBE_ROOT: ${{ github.workspace }}/footer-probe
+    steps:
+      - name: Check out this verification harness
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          clean: false
+      - name: Check out the exact PR source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: ro-legal-docx/wordcraft
+          ref: 7ce6dd456c0275d612dcdbb832652a0349cb6a40
+          path: source
+          persist-credentials: false
+          clean: false
+      - name: Verify source identity and scope
+        run: |
+          test "$(git -C source rev-parse HEAD)" = 7ce6dd456c0275d612dcdbb832652a0349cb6a40
+          printf '%s\n' 'Source: `7ce6dd456c0275d612dcdbb832652a0349cb6a40`' 'Scope: DOCX checks and synthetic native CLI renders on Linux/Windows; no full workspace CI or SonarCloud.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Install Rust and probe dependencies
+        run: |
+          rustup toolchain install 1.95.0 --profile minimal --no-self-update --component clippy --component rustfmt --target wasm32-unknown-unknown
+          python -m pip install --disable-pip-version-check pypdf Pillow
+      - name: Format and DOCX static checks
+        working-directory: source
+        run: |
+          cargo +1.95.0 fmt --all -- --check
+          cargo +1.95.0 clippy -p wordcraft-docx --all-targets --locked -- -D warnings
+      - name: DOCX unit and integration tests
+        working-directory: source
+        run: cargo +1.95.0 test -p wordcraft-docx --lib --test it --locked
+      - name: Asset and layering gates
+        working-directory: source
+        run: |
+          cargo +1.95.0 xtask assets
+          cargo +1.95.0 xtask layers
+      - name: DOCX WebAssembly check
+        working-directory: source
+        run: cargo +1.95.0 check -p wordcraft-docx --target wasm32-unknown-unknown --locked
+      - name: Build the native CLI
+        working-directory: source
+        run: cargo +1.95.0 build -p wordcraft-cli --locked
+      - name: Generate original synthetic documents
+        run: |
+          python ci/footer-probe/make_base.py "$PROBE_ROOT"
+          python ci/footer-probe/make_extra.py "$PROBE_ROOT"
+      - name: Verify DOCX/PDF content and native renders
+        run: python ci/footer-probe/verify.py source/target/debug/wordcraft-cli "$PROBE_ROOT"
+      - name: Lockfile unchanged
+        working-directory: source
+        run: git diff --exit-code -- Cargo.lock
+      - name: Upload synthetic probe results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wordcraft-4703-${{ matrix.os }}
+          path: ${{ env.PROBE_ROOT }}/results
+          if-no-files-found: ignore
