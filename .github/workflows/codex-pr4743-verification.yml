@@ -1,0 +1,125 @@
+name: Codex PR 4743 Romanian proofing verification
+run-name: Romanian proofing at 7ef5fccf
+on:
+  push:
+    branches: [codex/ci-romanian-4743-20261028]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    if: github.repository == 'ro-legal-docx/wordcraft'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    env:
+      CARGO_TERM_COLOR: always
+      CARGO_INCREMENTAL: "0"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
+      CARGO_BUILD_JOBS: "2"
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: utf-8
+      TMPDIR: ${{ github.workspace }}/tmp
+      TMP: ${{ github.workspace }}/tmp
+      TEMP: ${{ github.workspace }}/tmp
+      CRAFT_I18N_DIR: ${{ github.workspace }}/i18n
+      CRAFT_I18N_REQUIRED: "1"
+      WORDCRAFT_NO_PREFS: "1"
+      WORDCRAFT_DICTIONARIES: ${{ github.workspace }}/ro-probe/dictionaries
+    steps:
+      - name: Check out this verification harness
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          clean: false
+      - name: Check out exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: ro-legal-docx/wordcraft
+          ref: 7ef5fccf941c19dc574c2dfbdaea544bd1388de3
+          path: source
+          persist-credentials: false
+          clean: false
+      - name: Check out exact interface catalogs
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: storytold/craft-i18n
+          ref: 9205108cfdced5177706264038848b68b2422d2b
+          path: i18n
+          persist-credentials: false
+          clean: false
+      - name: Verify identity and scope
+        run: |
+          mkdir -p "$TMPDIR"
+          test "$(git -C source rev-parse HEAD)" = 7ef5fccf941c19dc574c2dfbdaea544bd1388de3
+          test "$(git -C i18n rev-parse HEAD)" = "$(tr -d '\r\n' < source/craft-i18n.rev)"
+          printf '%s\n' 'Exact source: `7ef5fccf941c19dc574c2dfbdaea544bd1388de3`' 'Scope: proof units except 12 deleting tests; Romanian engine/UI behavior with real catalogs; strict static/wasm/assets/layer gates; native synthetic Rospell/DOCX probes. One ambiguous spelling is documented. No full workspace CI, servers or SonarCloud.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Fetch external dictionary with fixed hashes
+        run: python ci/fetch-romanian-dictionary.py ro-probe
+      - name: Native UI build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libgtk-3-dev libfontconfig1-dev libfreetype-dev
+      - name: Cache Rust artifacts
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: |
+            source/target
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: codex-roproof-${{ runner.os }}-rust195-${{ hashFiles('source/Cargo.lock') }}
+      - name: Install Rust
+        run: rustup toolchain install 1.95.0 --profile minimal --no-self-update --component clippy --component rustfmt --target wasm32-unknown-unknown
+      - name: Format and strict static checks
+        working-directory: source
+        run: |
+          cargo +1.95.0 fmt --all -- --check
+          cargo +1.95.0 clippy -p wordcraft-proof -p wordcraft-engine -p wordcraft-ui-egui --all-targets --locked -- -D warnings
+      - name: Proof component tests without deleting tests
+        run: |
+          python - <<'PYTEST'
+          import subprocess,json
+          cmd=['cargo','+1.95.0','test','-p','wordcraft-proof','--lib','--locked','--']
+          for name in json.load(open('ci/proof-exclusions.json')):cmd+=['--skip',name]
+          subprocess.run(cmd,cwd='source',check=True)
+          PYTEST
+      - name: Romanian review command lifecycle
+        working-directory: source
+        run: cargo +1.95.0 test -p wordcraft-engine --lib romanian_office_proofing_commands --locked
+      - name: Romanian interface and saved default behavior
+        working-directory: source
+        run: |
+          cargo +1.95.0 test -p wordcraft-ui-egui --lib romanian_ --locked
+          cargo +1.95.0 test -p wordcraft-ui-egui --lib the_editing_languages_are_the_ones_wordcraft_can_proof --locked
+      - name: Asset and layering gates
+        working-directory: source
+        run: |
+          cargo +1.95.0 xtask assets
+          cargo +1.95.0 xtask layers
+      - name: Engine and UI WebAssembly check
+        working-directory: source
+        run: cargo +1.95.0 check -p wordcraft-engine -p wordcraft-ui-egui --target wasm32-unknown-unknown --locked
+      - name: Native CLI synthetic dictionary and DOCX probe
+        run: |
+          cargo +1.95.0 build --manifest-path source/Cargo.toml -p wordcraft-cli --locked
+          python ci/romanian-proofing.py ro-probe source/target/debug/wordcraft-cli
+      - name: Lockfile unchanged
+        working-directory: source
+        run: git diff --exit-code -- Cargo.lock
+      - name: Upload synthetic results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: wordcraft-4743-${{ matrix.os }}
+          path: |
+            ro-probe/native-probe
+            ro-probe/dictionaries/provenance.json
+          if-no-files-found: ignore

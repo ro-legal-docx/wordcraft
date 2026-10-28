@@ -1,0 +1,14 @@
+[
+  "a_turkish_dictionary_in_iso_8859_9_loads_from_disk",
+  "dictionary_lookup_accepts_czech_file_names",
+  "dictionary_lookup_accepts_indonesian_file_names",
+  "each_variety_looks_for_its_own_dictionary_first",
+  "finds_and_loads_a_pair_in_a_directory",
+  "hostile_dictionary_files_are_capped",
+  "missing_dictionary_file_loads_empty",
+  "reads_are_bounded_and_regular_files_only",
+  "saving_merges_with_the_file",
+  "swiss_dictionary_files_are_found",
+  "user_dictionary_and_ignore_all_match_both_normalization_forms",
+  "user_dictionary_persists_through_a_file"
+]
