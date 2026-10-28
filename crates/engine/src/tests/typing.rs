@@ -3386,3 +3386,162 @@ fn double_space_adds_a_period_when_asked() {
     typ(&mut t, "Hello  world");
     assert_eq!(text(&t), "Hello  world");
 }
+
+/// Where the first paragraph's list label starts (points from the page's text edge), and where its text starts.
+fn label_and_text_x(s: &mut Session) -> (f32, f32) {
+    let l = s.layout();
+    l.pages
+        .iter()
+        .flat_map(|p| &p.items)
+        .find_map(|i| {
+            if let wordcraft_layout::Placed::Lines { para, l0: 0, .. } = i { para.label.as_ref().map(|lb| (lb.x, lb.x + lb.width)) } else { None }
+        })
+        .expect("a list label")
+}
+
+/// #4287: changing a list item's level (Change List Level, Tab, Shift+Tab) puts it at the new level's
+/// indent, also when it carried a direct indent (a ruler drag, a pasted block, a Word file's `w:ind`).
+#[test]
+fn changing_a_list_level_drops_a_direct_indent() {
+    // The reference: a fresh list item moved to level 2 with no direct indent in the way.
+    let fresh = |command: &str, params: serde_json::Value| {
+        let mut s = s();
+        typ(&mut s, "Item");
+        run(&mut s, "para.numbering", json!({"kind": "upperLetter"}));
+        run(&mut s, command, params);
+        label_and_text_x(&mut s)
+    };
+    let dragged = |command: &str, params: serde_json::Value| {
+        let mut s = s();
+        typ(&mut s, "Item");
+        run(&mut s, "para.numbering", json!({"kind": "upperLetter"}));
+        // The ruler's left-indent marker dragged to a custom place.
+        run(&mut s, "para.indents", json!({"left": 120.0, "firstLine": -6.0}));
+        run(&mut s, command, params);
+        label_and_text_x(&mut s)
+    };
+    for (command, params) in [("para.listLevel", json!({"level": 1})), ("para.indent", json!({}))] {
+        assert_eq!(dragged(command, params.clone()), fresh(command, params), "{command}");
+    }
+    // Back out (Shift+Tab) from level 2 to 1 as well.
+    let back = |drag: bool| {
+        let mut s = s();
+        typ(&mut s, "Item");
+        run(&mut s, "para.numbering", json!({"kind": "upperLetter"}));
+        run(&mut s, "para.listLevel", json!({"level": 1}));
+        if drag {
+            run(&mut s, "para.indents", json!({"left": 200.0, "firstLine": -30.0}));
+        }
+        run(&mut s, "para.outdent", json!({}));
+        label_and_text_x(&mut s)
+    };
+    assert_eq!(back(true), back(false), "para.outdent");
+    // A ruler drag with no level change sticks.
+    let mut s = s();
+    typ(&mut s, "Item");
+    run(&mut s, "para.numbering", json!({"kind": "upperLetter"}));
+    let before = label_and_text_x(&mut s);
+    run(&mut s, "para.indents", json!({"left": 120.0, "firstLine": -6.0}));
+    assert_ne!(label_and_text_x(&mut s), before, "the drag moves the item");
+}
+
+/// Same-level and boundary commands keep all four direct indent forms and do not create history.
+#[test]
+fn list_level_boundaries_keep_direct_indents_and_roundtrip() {
+    for (level, command, params) in [(0, "para.outdent", json!({})), (8, "para.indent", json!({})), (2, "para.listLevel", json!({"level":2}))] {
+        let mut s = s();
+        typ(&mut s, "ELEMENT SINTETIC");
+        run(&mut s, "para.numbering", json!({"kind":"upperLetter"}));
+        run(&mut s, "para.listLevel", json!({"level":level}));
+        run(&mut s, "para.indents", json!({"left":120.0,"firstLine":-6.0}));
+        let path = s.sel.focus.path.clone();
+        let props = &mut s.doc.para_mut(StoryRef::Body, &path).unwrap().props;
+        props.indent_left_chars = Some(5.0);
+        props.indent_first_chars = Some(-1.0);
+        let before = props.clone();
+        let labels = s.undo_labels();
+        run(&mut s, command, params);
+        assert_eq!(s.doc.para(StoryRef::Body, &path).unwrap().props, before);
+        assert_eq!(s.undo_labels(), labels);
+        let reopened = wordcraft_docx::read(&wordcraft_docx::write(&s.doc).unwrap()).unwrap();
+        let saved = &reopened.para(StoryRef::Body, &path).unwrap().props;
+        assert_eq!(
+            (saved.indent_left, saved.indent_first, saved.indent_left_chars, saved.indent_first_chars),
+            (before.indent_left, before.indent_first, before.indent_left_chars, before.indent_first_chars)
+        );
+    }
+}
+
+/// Style-based lists, including a basedOn chain, change level and preserve the result in DOCX.
+#[test]
+fn inherited_list_level_changes_like_direct_numbering() {
+    for (initial, command, params, expected) in
+        [(0, "para.listLevel", json!({"level":1}), 1), (0, "para.indent", json!({}), 1), (1, "para.outdent", json!({}), 0)]
+    {
+        let mut s = s();
+        typ(&mut s, "ELEMENT SINTETIC");
+        run(&mut s, "para.numbering", json!({"kind":"upperLetter"}));
+        let path = s.sel.focus.path.clone();
+        let mut number = s.doc.para(StoryRef::Body, &path).unwrap().props.numbering.unwrap();
+        number.level = initial;
+        let mut style = wordcraft_doc::Style { id: "SyntheticList".into(), name: "Synthetic list".into(), ..Default::default() };
+        style.para.numbering = Some(number);
+        s.doc.styles.styles.push(style);
+        s.doc.styles.styles.push(wordcraft_doc::Style {
+            id: "SyntheticChild".into(),
+            name: "Synthetic child".into(),
+            based_on: Some("SyntheticList".into()),
+            ..Default::default()
+        });
+        let props = &mut s.doc.para_mut(StoryRef::Body, &path).unwrap().props;
+        props.style = Some("SyntheticChild".into());
+        props.numbering = None;
+        props.indent_left = Some(120.0);
+        props.indent_first = Some(-6.0);
+        props.indent_left_chars = Some(5.0);
+        props.indent_first_chars = Some(-1.0);
+        let before = s.doc.clone();
+        run(&mut s, command, params);
+        let p = &s.doc.para(StoryRef::Body, &path).unwrap().props;
+        assert_eq!(s.doc.styles.resolve_para(p).numbering.unwrap().level, expected, "{command}");
+        assert_eq!((p.indent_left, p.indent_first, p.indent_left_chars, p.indent_first_chars), (None, None, None, None));
+        let after = s.doc.clone();
+        run(&mut s, "edit.undo", json!({}));
+        assert_eq!(s.doc, before);
+        run(&mut s, "edit.redo", json!({}));
+        assert_eq!(s.doc, after);
+        let reopened = wordcraft_docx::read(&wordcraft_docx::write(&s.doc).unwrap()).unwrap();
+        let p = &reopened.para(StoryRef::Body, &path).unwrap().props;
+        assert_eq!(reopened.styles.resolve_para(p).numbering.unwrap().level, expected);
+    }
+}
+
+/// Bounds and explicit numbering cancellation remain no-ops for a style-based list.
+#[test]
+fn inherited_list_boundaries_and_opt_out_do_not_override_the_style() {
+    for (level, command, params, cancel) in [
+        (0, "para.outdent", json!({}), false),
+        (8, "para.indent", json!({}), false),
+        (2, "para.listLevel", json!({"level":2}), false),
+        (0, "para.listLevel", json!({"level":1}), true),
+    ] {
+        let mut s = s();
+        typ(&mut s, "ELEMENT SINTETIC");
+        run(&mut s, "para.numbering", json!({}));
+        let path = s.sel.focus.path.clone();
+        let mut number = s.doc.para(StoryRef::Body, &path).unwrap().props.numbering.unwrap();
+        number.level = level;
+        let mut style = wordcraft_doc::Style { id: "SyntheticList".into(), name: "Synthetic list".into(), ..Default::default() };
+        style.para.numbering = Some(number);
+        s.doc.styles.styles.push(style);
+        let props = &mut s.doc.para_mut(StoryRef::Body, &path).unwrap().props;
+        props.style = Some("SyntheticList".into());
+        props.numbering = if cancel { Some(wordcraft_doc::props::NumRef { num: 0, level: 0 }) } else { None };
+        props.indent_left = Some(100.0);
+        let before = s.doc.clone();
+        let history = s.undo_labels();
+        run(&mut s, command, params);
+        assert_eq!(s.doc, before, "{command}, cancel={cancel}");
+        assert_eq!(s.undo_labels(), history);
+    }
+}

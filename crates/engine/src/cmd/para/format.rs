@@ -139,6 +139,33 @@ pub(super) fn set_props(s: &mut Session, v: &Value) -> CmdResult {
     sel_result(s)
 }
 
+/// A list level change takes its new indents instead of keeping a direct ruler override (#4287).
+pub(super) fn drop_direct_indents(p: &mut ParaProps) {
+    p.indent_left = None;
+    p.indent_first = None;
+    p.indent_left_chars = None;
+    p.indent_first_chars = None;
+}
+
+/// Change an effective list level, including numbering inherited through a paragraph style.
+pub(super) fn list_level(s: &mut Session, v: &Value) -> CmdResult {
+    let level = p::u64(v, "level").unwrap_or(0).min(8) as u8;
+    let story = s.sel.focus.story;
+    for path in crate::cmd::selected_paths(s) {
+        let Some(number) = s.doc.para(story, &path).and_then(|p| s.doc.styles.resolve_para(&p.props).numbering).filter(|n| n.num != 0) else {
+            continue;
+        };
+        if number.level != level {
+            let para = s.doc.para_mut(story, &path)?;
+            para.props.numbering = Some(NumRef { num: number.num, level });
+            drop_direct_indents(&mut para.props);
+            para.touch();
+        }
+    }
+    sel_result(s)
+}
+
+/// Indent effective list numbering by one level, or advance an ordinary paragraph to a tab stop.
 pub fn indent(s: &mut Session, _: &Value) -> CmdResult {
     let a = s.sel.ordered().0;
     let paths = crate::cmd::selected_paths(s);
@@ -146,11 +173,17 @@ pub fn indent(s: &mut Session, _: &Value) -> CmdResult {
     for path in paths {
         let (num, left) = {
             let Some(p) = s.doc.para(a.story, &path) else { continue };
-            (p.props.numbering.filter(|n| n.num != 0), s.doc.styles.resolve_para(&p.props).indent_left)
+            (s.doc.styles.resolve_para(&p.props).numbering.filter(|n| n.num != 0), s.doc.styles.resolve_para(&p.props).indent_left)
         };
         let para = s.doc.para_mut(a.story, &path)?;
         match num {
-            Some(n) => para.props.numbering = Some(NumRef { num: n.num, level: n.level.saturating_add(1).min(8) }),
+            Some(n) => {
+                let level = n.level.saturating_add(1).min(8);
+                if level != n.level {
+                    para.props.numbering = Some(NumRef { num: n.num, level });
+                    drop_direct_indents(&mut para.props);
+                }
+            }
             None => {
                 para.props.indent_left = Some(((left / tab).floor() + 1.0) * tab);
                 para.props.cancel_char_indents(true, false, false);
@@ -161,6 +194,7 @@ pub fn indent(s: &mut Session, _: &Value) -> CmdResult {
     sel_result(s)
 }
 
+/// Outdent effective list numbering by one level, or retreat an ordinary paragraph to a tab stop.
 pub fn outdent(s: &mut Session, _: &Value) -> CmdResult {
     let a = s.sel.ordered().0;
     let paths = crate::cmd::selected_paths(s);
@@ -168,11 +202,17 @@ pub fn outdent(s: &mut Session, _: &Value) -> CmdResult {
     for path in paths {
         let (num, left) = {
             let Some(p) = s.doc.para(a.story, &path) else { continue };
-            (p.props.numbering.filter(|n| n.num != 0), s.doc.styles.resolve_para(&p.props).indent_left)
+            (s.doc.styles.resolve_para(&p.props).numbering.filter(|n| n.num != 0), s.doc.styles.resolve_para(&p.props).indent_left)
         };
         let para = s.doc.para_mut(a.story, &path)?;
         match num {
-            Some(n) => para.props.numbering = Some(NumRef { num: n.num, level: n.level.saturating_sub(1) }),
+            Some(n) => {
+                let level = n.level.saturating_sub(1);
+                if level != n.level {
+                    para.props.numbering = Some(NumRef { num: n.num, level });
+                    drop_direct_indents(&mut para.props);
+                }
+            }
             None => {
                 para.props.indent_left = Some((((left / tab).ceil() - 1.0) * tab).max(0.0));
                 para.props.cancel_char_indents(true, false, false);
