@@ -272,6 +272,8 @@ Repeated DOCX style IDs use the last complete definition. The original regressio
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-28 | trivial | Corrected the RTF reader parity note: body-level `\facingp` restores the even/odd-header setting; story-local and table-cell controls do not. Other limitations and readiness estimates are unchanged. |
+| 2026-10-27 | trivial | RTF section header/footer export: synthetic regressions for section boundaries, story variants, resources and explicit empty destinations. Readiness estimates unchanged. RTF control-word spelling and Markdown spacing corrected after review. Facing-page import/export now retains the document setting; two further synthetic regressions cover enabled, disabled and story-local controls. |
 | 2026-10-17 | trivial | Encryption rows: Standard (Word 2007, AES-ECB) encrypted packages open with a password, also when named `.doc`/`.dot`; AES headers in Word 97-2003 files are outside the public spec and refused (gap 9). The duplicate combined `.docx`/`.doc` row is removed; the `.doc` row reads 🟡 ~60% (it opens XOR/RC4/RC4 CryptoAPI); hours 2–4 → 1–2 and 4–6 → 1–2 (left: checks against Word-written files); total re-summed from the rows, 175–287 h |
 | 2026-10-25 | trivial | Repeated DOCX style IDs: repeated save/reopen regression for whole-definition replacement. |
 | 2026-10-25 | trivial | Arabic list labels: `arabicAlpha` and `arabicAbjad` draw the 28 Arabic letters (alphabetical and abjad order), doubling past the last letter; Hebrew, Hindi, Thai and Vietnamese still show decimal (`doc::section::tests::arabic_letters_count_in_both_orders`) |
