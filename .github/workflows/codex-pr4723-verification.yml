@@ -1,0 +1,91 @@
+name: Codex PR 4723 cross-platform verification
+run-name: WordCraft PR 4723 at fd1f683f
+on:
+  push:
+    branches: [codex/ci-wordcraft-4723-20261028]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    if: github.repository == 'ro-legal-docx/wordcraft'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    env:
+      CARGO_TERM_COLOR: always
+      CARGO_INCREMENTAL: "0"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
+      CARGO_BUILD_JOBS: "2"
+      PYTHONUTF8: "1"
+      WORDCRAFT_REGION: ro-RO
+      PROBE_ROOT: ${{ github.workspace }}/list-probe
+    steps:
+      - name: Check out this verification harness
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          clean: false
+      - name: Check out the exact PR source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: ro-legal-docx/wordcraft
+          ref: fd1f683f2fad625cfe35632c91d39413b8ee139b
+          path: source
+          persist-credentials: false
+          clean: false
+      - name: Verify source identity and scope
+        run: |
+          test "$(git -C source rev-parse HEAD)" = fd1f683f2fad625cfe35632c91d39413b8ee139b
+          printf '%s\n' 'Source: `fd1f683f2fad625cfe35632c91d39413b8ee139b`' 'Scope: engine typing tests and ten original synthetic DOCX/PDF controls on Linux/Windows. Native DOCX raster and PDF text/coordinate checks; no full workspace CI, deleting tests, servers or native Word acceptance.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Cache Rust artifacts
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: |
+            source/target
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: codex-lists-${{ runner.os }}-rust195-${{ hashFiles('source/Cargo.lock') }}
+      - name: Install Rust and probe dependencies
+        run: |
+          rustup toolchain install 1.95.0 --profile minimal --no-self-update --component clippy --component rustfmt --target wasm32-unknown-unknown
+          python -m pip install --disable-pip-version-check pypdf Pillow
+      - name: Format and Engine typing static checks
+        working-directory: source
+        run: |
+          cargo +1.95.0 fmt --all -- --check
+          cargo +1.95.0 clippy -p wordcraft-engine --all-targets --locked -- -D warnings
+      - name: Engine typing unit and integration tests
+        working-directory: source
+        run: |
+          cargo +1.95.0 test -p wordcraft-engine --lib tests::typing:: --locked
+      - name: Asset and layering gates
+        working-directory: source
+        run: |
+          cargo +1.95.0 xtask assets
+          cargo +1.95.0 xtask layers
+      - name: Engine typing WebAssembly check
+        working-directory: source
+        run: cargo +1.95.0 check -p wordcraft-engine --target wasm32-unknown-unknown --locked
+      - name: Build the native CLI
+        working-directory: source
+        run: cargo +1.95.0 build -p wordcraft-cli --locked
+      - name: Native synthetic edit and export probe
+        run: python ci/list-level-probe.py "$PROBE_ROOT" source/target/debug/wordcraft-cli
+      - name: Lockfile unchanged
+        working-directory: source
+        run: git diff --exit-code -- Cargo.lock
+      - name: Upload synthetic probe results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wordcraft-4723-${{ matrix.os }}
+          path: ${{ env.PROBE_ROOT }}/results
+          if-no-files-found: ignore
