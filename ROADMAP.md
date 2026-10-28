@@ -1,5 +1,9 @@
 # WordCraft roadmap
 
+> **Footer fidelity update:** 2026-10-28 · DOCX footer table round-trip geometry. Readiness estimates unchanged.
+
+Footer tables at the end of a footer no longer gain an empty paragraph on DOCX save. This preserves footer height and table placement after reopening; synthetic round-trip and render controls only. The disappearance reported on Windows in #3114 remains unconfirmed.
+
 > **Highlight update:** 2026-10-25 · Highlight shortcut toggles the last chosen colour off when the whole selection has it; explicit colour commands remain setters (#4085). Readiness estimates unchanged.
 
 **Stage: alpha** · next: beta, ~15 points (60% → 75% ready for real work) and ~150–230 h away
@@ -644,6 +648,7 @@ Footer page-table height and body wrapping are corrected. Other pagination gaps 
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-28 | minor | Preserve table-only footer endings on DOCX save; synthetic structure and save/reopen placement checks; #3114 disappearance remains unreproduced. |
 | 2026-10-22 | trivial | Progress log: one native window per open document |
 | 2026-10-22 | trivial | Progress log: every open document keeps its own recovery copy |
 | 2026-10-22 | trivial | Progress log: several open documents in the desktop window |
