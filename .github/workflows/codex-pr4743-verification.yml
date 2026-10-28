@@ -1,5 +1,5 @@
 name: Codex PR 4743 Romanian proofing verification
-run-name: Romanian proofing at 7ef5fccf
+run-name: Romanian proofing at aa96446a
 on:
   push:
     branches: [codex/ci-romanian-4743-20261028]
@@ -43,7 +43,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: ro-legal-docx/wordcraft
-          ref: 7ef5fccf941c19dc574c2dfbdaea544bd1388de3
+          ref: aa96446adea61ed754637456c2cfee8baad9545e
           path: source
           persist-credentials: false
           clean: false
@@ -58,9 +58,9 @@ jobs:
       - name: Verify identity and scope
         run: |
           mkdir -p "$TMPDIR"
-          test "$(git -C source rev-parse HEAD)" = 7ef5fccf941c19dc574c2dfbdaea544bd1388de3
+          test "$(git -C source rev-parse HEAD)" = aa96446adea61ed754637456c2cfee8baad9545e
           test "$(git -C i18n rev-parse HEAD)" = "$(tr -d '\r\n' < source/craft-i18n.rev)"
-          printf '%s\n' 'Exact source: `7ef5fccf941c19dc574c2dfbdaea544bd1388de3`' 'Scope: proof units except 12 deleting tests; Romanian engine/UI behavior with real catalogs; strict static/wasm/assets/layer gates; native synthetic Rospell/DOCX probes. One ambiguous spelling is documented. No full workspace CI, servers or SonarCloud.' >> "$GITHUB_STEP_SUMMARY"
+          printf '%s\n' 'Exact source: `aa96446adea61ed754637456c2cfee8baad9545e`' 'Scope: proof units except 12 deleting tests; Romanian engine/UI behavior with real catalogs; strict static/wasm/assets/layer gates; native synthetic Rospell/DOCX probes. One ambiguous spelling is documented. No full workspace CI, servers or SonarCloud.' >> "$GITHUB_STEP_SUMMARY"
       - name: Fetch external dictionary with fixed hashes
         run: python ci/fetch-romanian-dictionary.py ro-probe
       - name: Native UI build dependencies
@@ -93,7 +93,7 @@ jobs:
           PYTEST
       - name: Romanian review command lifecycle
         working-directory: source
-        run: cargo +1.95.0 test -p wordcraft-engine --lib romanian_office_proofing_commands --locked
+        run: cargo +1.95.0 test -p wordcraft-engine --lib --locked -- romanian_office_proofing_commands dictionaries_folder_option_is_saved_searched_and_reported --test-threads=2
       - name: Romanian interface and saved default behavior
         working-directory: source
         run: |
