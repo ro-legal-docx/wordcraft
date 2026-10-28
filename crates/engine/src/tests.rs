@@ -11086,3 +11086,40 @@ fn scale_font_sizes_reaches_char_table_and_cs_sizes_and_unset_default() {
     assert_eq!(grid.header_chr.size, Some(16.0));
     assert_eq!(grid.regions.get(&TablePart::Band2Horz).unwrap().chr.size, Some(10.0));
 }
+
+/// Romanian spelling, suggestions and basic grammar work through the public review commands.
+#[test]
+fn romanian_office_proofing_commands() {
+    let aff = "SET UTF-8\nTRY abcdefghijklmnoprsștțuvzăâî\nMAP 3\nMAP aăâ\nMAP sș\nMAP tț\n";
+    let dic = "6\ndocumentul\neste\natașat\ncererea\nmare\nexemplu\n";
+    wordcraft_proof::ro::install_dictionary(aff, dic).unwrap();
+    let mut s = s();
+    run(&mut s, "document.setText", json!({"text":"Documentul este atasat. Cererea este mare mare."}));
+    run(&mut s, "select.all", json!({}));
+    run(&mut s, "review.language", json!({"lang":"ro_RO", "default":true}));
+    assert_eq!(s.doc.styles.default_chr.lang.as_deref(), Some("ro-RO"));
+    assert_eq!(run(&mut s, "format.state", json!({}))["lang"], "ro-RO");
+    let issues = run(&mut s, "review.issues", json!({}));
+    let found = issues.as_array().unwrap();
+    assert_eq!(found.len(), 2, "{issues}");
+    assert!(
+        found.iter().any(|i| i["text"] == "atasat"
+            && i["kind"] == "spelling"
+            && i["lang"] == "ro"
+            && i["suggestions"].as_array().unwrap().iter().any(|v| v == "atașat")),
+        "{issues}"
+    );
+    assert!(found.iter().any(|i| i["text"] == "mare mare" && i["kind"] == "grammar" && i["lang"] == "ro"), "{issues}");
+    run(&mut s, "caret.docStart", json!({}));
+    assert_eq!(run(&mut s, "review.spelling", json!({}))["text"], "atasat");
+    run(&mut s, "review.applySuggestion", json!({"text":"atașat"}));
+    assert!(text(&s).starts_with("Documentul este atașat."));
+    run(&mut s, "edit.undo", json!({}));
+    assert!(text(&s).starts_with("Documentul este atasat."));
+    run(&mut s, "edit.redo", json!({}));
+    assert!(text(&s).starts_with("Documentul este atașat."));
+    // Adding an unfamiliar word is available without turning off Romanian proofing.
+    run(&mut s, "document.setText", json!({"text":"Exemplusintetic."}));
+    run(&mut s, "review.addToDictionary", json!({"word":"exemplusintetic"}));
+    assert!(run(&mut s, "review.issues", json!({})).as_array().unwrap().is_empty());
+}
