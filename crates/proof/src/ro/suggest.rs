@@ -72,7 +72,7 @@ fn can_suggest_phrase(d: &AffixDict, text: &str) -> bool {
     text.split(' ').all(|word| {
         !word.is_empty()
             && (d.can_suggest(word)
-                || (word.contains('-') && !d.is_listed_even_if_excluded(word) && word.split('-').all(|part| !part.is_empty() && d.can_suggest(part))))
+                || (word.contains('-') && !d.excludes_suggestions(word) && word.split('-').all(|part| !part.is_empty() && d.can_suggest(part))))
     })
 }
 
@@ -431,15 +431,18 @@ mod tests {
     #[test]
     fn romanian_compound_exclusions_are_not_bypassed() {
         let d = crate::affix::AffixDict::from_hunspell(
-            "SET UTF-8\nNOSUGGEST N\nFORBIDDENWORD F\nMAP 1\nMAP aă\nSFX A Y 1\nSFX A 0 uri .\n",
-            "4\ncasă\ncaz/A\ncasă-casă/N\ncasă-caz/F\n",
+            "SET UTF-8\nNOSUGGEST N\nFORBIDDENWORD F\nMAP 1\nMAP aă\nSFX A Y 1\nSFX A 0 uri .\nREP 2\nREP xyz Casă-Casă\nREP zyx Caz-Casă\n",
+            "7\ncasă\ncaz/A\nCasă\nCaz\ncasă-casă/N\ncasă-caz/F\ncaz-casă\n",
             &[],
         )
         .unwrap();
         assert!(crate::ro::is_correct_with(&d, "casă-casă"));
         assert!(!crate::ro::is_correct_with(&d, "casă-caz"));
+        assert!(!crate::ro::is_correct_with(&d, "Casă-Caz"));
+        assert!(crate::ro::is_correct_with(&d, "Caz-Casă"));
+        assert!(suggest_in(&d, "zyx", 12).contains(&"Caz-Casă".to_string()));
         assert!(crate::ro::is_correct_with(&d, "caz-caz"));
-        for input in ["casa-casă", "casă-casax", "casa-caz", "CASA-CASĂ"] {
+        for input in ["casa-casă", "casă-casax", "casa-caz", "CASA-CASĂ", "xyz"] {
             let found = suggest_in(&d, input, 12);
             assert!(found.iter().all(|w| !["casă-casă", "casă-caz"].contains(&w.to_lowercase().as_str())), "{input}: {found:?}");
         }

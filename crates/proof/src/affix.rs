@@ -742,10 +742,22 @@ impl AffixDict {
         self.check_excluding(w, self.forbidden | self.no_suggest)
     }
 
-    /// Whether this casing/form is listed even when FORBIDDENWORD or NOSUGGEST excludes it.
-    /// Only guards fallback paths; it must never be used as a correctness check.
-    pub(crate) fn is_listed_even_if_excluded(&self, w: &str) -> bool {
-        self.check_excluding(w, 0)
+    /// Does a listed spelling forbid compound fallback, including mixed-case variants?
+    pub(crate) fn excludes_spelling(&self, word: &str) -> bool {
+        self.excludes_variant(word, self.forbidden)
+    }
+
+    /// Does a listed spelling forbid suggestion fallback, including mixed-case variants?
+    pub(crate) fn excludes_suggestions(&self, word: &str) -> bool {
+        self.excludes_variant(word, self.forbidden | self.no_suggest)
+    }
+
+    fn excludes_variant(&self, word: &str, mask: u128) -> bool {
+        if mask == 0 {
+            return false;
+        }
+        let excluded = |form: &str| self.check_excluding(form, 0) && !self.check_excluding(form, mask);
+        excluded(word) || (matches!(casing(word), Casing::Mixed) && excluded(&word.to_lowercase()))
     }
 
     fn check_excluding(&self, w: &str, excluded: u128) -> bool {
@@ -1124,15 +1136,23 @@ pub(crate) mod tests {
         }
     }
 
-    /// Fallback callers can distinguish explicitly excluded words from unknown compounds.
+    /// Compound guards honor exclusions in mixed case without rejecting ordinary words.
     #[test]
     fn excluded_listing_includes_case_and_affixed_forms() {
-        let d = AffixDict::from_hunspell("NOSUGGEST N\nFORBIDDENWORD F\nSFX A Y 1\nSFX A 0 s .\n", "2\nsecret/NA\nbanned/FA\n", &[]).unwrap();
-        for word in ["secret", "Secrets", "banned", "BANNEDS"] {
-            assert!(d.is_listed_even_if_excluded(word), "{word}");
-            assert!(!d.can_suggest(word), "{word}");
+        let d =
+            AffixDict::from_hunspell("NOSUGGEST N\nFORBIDDENWORD F\nSFX A Y 1\nSFX A 0 s .\n", "3\nsecret/NA\nbanned/FA\nordinary/A\n", &[]).unwrap();
+        for word in ["secret", "Secrets", "SeCrEt"] {
+            assert!(!d.excludes_spelling(word), "NOSUGGEST is correct: {word}");
+            assert!(d.excludes_suggestions(word), "{word}");
         }
-        assert!(!d.is_listed_even_if_excluded("unknown"));
+        for word in ["banned", "BANNEDS", "BanNeD"] {
+            assert!(d.excludes_spelling(word), "{word}");
+            assert!(d.excludes_suggestions(word), "{word}");
+        }
+        for word in ["unknown", "ordinary", "OrDiNaRy"] {
+            assert!(!d.excludes_spelling(word), "{word}");
+            assert!(!d.excludes_suggestions(word), "{word}");
+        }
     }
 
     #[test]
