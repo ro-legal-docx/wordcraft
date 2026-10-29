@@ -152,6 +152,7 @@ Small follow-ups from the 2026-10-25 field, table and AutoFormat batch (#4232):
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-29 | minor | Review follow-up for #4736: distinguish a physically fresh page from a mid-page continuous-section top, and keep repeated headers with the first oversized body fragment; synthetic regression coverage added. |
 | 2026-10-29 | minor | Oversized automatic/minimum-height cantSplit rows start on a fresh page and continue without clipping (#4736); fitting rows, repeated header rows and exact-height clipping retain their contracts. Native synthetic Word Mac 16.114.2 reference; readiness estimates unchanged. |
 | 2026-10-22 | trivial | View windows: several open documents and Switch Windows in the engine |
 | 2026-10-25 | trivial | egui 0.37 migration: interface catalogs remain pinned by `craft-i18n.rev` (`9205108…`; 27 languages, English fallback); IME surrounding deletions and composition resets are implemented with regressions, but managed CI passed; native IME acceptance and native-speaker catalog review remain open; no gap or readiness change |

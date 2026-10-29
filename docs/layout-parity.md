@@ -28,7 +28,7 @@ on page 3: all 100 markers remain visible. WordCraft previously placed the row o
 one page and left later text outside the page. The exception now splits an
 automatic/minimum-height row only after it reaches a fresh page. A row that fits
 on a fresh page still moves whole; exact heights and repeated header rows are not
-made splittable by this exception. The DOCX cantSplit property is retained.
+made splittable by this exception. The DOCX cantSplit property is retained. Physical page freshness is checked separately from section starts; repeated headers are counted before deciding whether the first body fragment can split.
 
 The [OOXML description](https://learn.microsoft.com/en-us/dotnet/api/documentformat.openxml.wordprocessing.cantsplit)
 allows oversized rows to continue. Microsoft's [implementation note](https://learn.microsoft.com/en-us/openspecs/office_standards/ms-oi29500/a55188f7-2443-4c17-ba5a-75999085bab4)
@@ -291,6 +291,7 @@ layout suite are pending; this is not a new Word/native-IME acceptance claim.
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-29 | minor | Review follow-up for #4736: distinguish a physically fresh page from a mid-page continuous-section top, and keep repeated headers with the first oversized body fragment; synthetic regression coverage added. |
 | 2026-10-29 | minor | Oversized automatic/minimum-height cantSplit rows start on a fresh page and continue without clipping (#4736); fitting rows, repeated header rows and exact-height clipping retain their contracts. Native synthetic Word Mac 16.114.2 reference; readiness estimates unchanged. |
 | 2026-10-25 | trivial | Arabic list labels: `arabicAlpha` and `arabicAbjad` draw the 28 Arabic letters (alphabetical and abjad order), doubling past the last letter; Hebrew, Hindi, Thai and Vietnamese still show decimal (`doc::section::tests::arabic_letters_count_in_both_orders`) |
 | 2026-10-24 | trivial | Preserve grapheme edit/wrap boundaries across independently drawn font/style pieces; original emoji regression retained, new mixed-style/bundled-font LTR/bidi controls pending managed validation |

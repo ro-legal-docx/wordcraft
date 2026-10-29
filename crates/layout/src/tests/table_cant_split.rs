@@ -2,14 +2,14 @@
 use super::*;
 
 /// Every source line is placed once, wholly inside its page's body rather than below it.
-fn assert_complete_row(layout: &DocLayout, block: u32, count: usize) -> Vec<usize> {
+fn assert_complete_row(layout: &DocLayout, block: u32, row: u32, count: usize) -> Vec<usize> {
     let mut seen = std::collections::BTreeSet::new();
     let mut pages = Vec::new();
     let mut total = 0;
     for (page_index, page) in layout.pages.iter().enumerate() {
         for item in &page.items {
             let Placed::Lines { story: StoryRef::Body, path, para, l0, l1, y, .. } = item else { continue };
-            if path.0.len() != 4 || path.0[..3] != [block, 0, 0] {
+            if path.0.len() != 4 || path.0[..3] != [block, row, 0] {
                 continue;
             }
             assert!(seen.insert(path.0[3]), "a short source paragraph is drawn only once");
@@ -40,7 +40,7 @@ fn oversized_cant_split_row_moves_once_then_flows() {
             }
         });
         assert_eq!(rows[0], Vec::<usize>::new(), "cantSplit still moves off the partly filled page");
-        let pages = assert_complete_row(&layout, 1, 80);
+        let pages = assert_complete_row(&layout, 1, 0, 80);
         assert_eq!(pages.first(), Some(&1));
         assert!(pages.len() >= 2, "a row taller than a page must continue");
     }
@@ -53,7 +53,7 @@ fn oversized_cant_split_row_at_page_top_flows_without_a_blank_page() {
         table.rows[0].props.cant_split = true;
         table.rows[0].cells[0].blocks = lines_in_cell(80, "Synthetic");
     });
-    let pages = assert_complete_row(&layout, 0, 80);
+    let pages = assert_complete_row(&layout, 0, 0, 80);
     assert_eq!(pages.first(), Some(&0));
     assert!(pages.len() >= 2);
 }
@@ -66,7 +66,7 @@ fn fitting_cant_split_row_still_moves_whole() {
         table.rows[0].cells[0].blocks = lines_in_cell(20, "Synthetic");
     });
     assert_eq!(rows, vec![vec![], vec![0]]);
-    assert_eq!(assert_complete_row(&layout, 1, 20), vec![1]);
+    assert_eq!(assert_complete_row(&layout, 1, 0, 20), vec![1]);
 }
 
 /// Exact heights retain their explicit clipping contract, even with cantSplit present.
@@ -81,4 +81,73 @@ fn exact_height_cant_split_row_is_not_split_to_reveal_overflow() {
     });
     assert_eq!(rows, vec![vec![0]]);
     assert!(layout.pages[0].items.iter().any(|item| matches!(item, Placed::Cell { table, row: 0, clip: true, .. } if table.0 == [0])));
+}
+
+/// A section top can lie below earlier physical-page content; it is not a fresh page.
+fn continuous_section_table(count: usize, header: bool) -> DocLayout {
+    let (mut doc, at) = at_least_rows_filler(200.0);
+    assert_eq!(at, 1);
+    let mut section = doc.last_section.clone();
+    section.start = SectionStart::Continuous;
+    doc.para_mut(StoryRef::Body, &Path::top(0)).unwrap().section = Some(Box::new(section));
+    doc.last_section.start = SectionStart::Continuous;
+    let mut table = Table::new(if header { 2 } else { 1 }, 1, 468.0);
+    let body = usize::from(header);
+    if header {
+        table.rows[0].props.header = true;
+        table.rows[0].props.height = Some(64.0);
+        table.rows[0].props.height_rule = HeightRule::AtLeast;
+    }
+    table.rows[body].props.cant_split = true;
+    table.rows[body].cells[0].blocks = lines_in_cell(count, "Synthetic");
+    set_at_least_row_spacing(&mut table);
+    doc.insert_block(StoryRef::Body, &Path::top(at), Block::Table(table)).unwrap();
+    let layout = lay(&doc);
+    assert_pagination_fixture_font(&layout);
+    layout
+}
+
+/// Both fitting and oversized rows leave a mid-page section before the split exception applies.
+#[test]
+fn cant_split_at_a_mid_page_section_top_moves_to_a_fresh_page() {
+    for count in [20, 80] {
+        let layout = continuous_section_table(count, false);
+        let pages = assert_complete_row(&layout, 1, 0, count);
+        assert_eq!(pages.first(), Some(&1), "a section boundary must not enable splitting on page 1");
+        if count == 20 {
+            assert_eq!(pages, vec![1], "a row that fits on the next page stays whole");
+        }
+    }
+}
+
+/// Capture freshness before placing one or more repeated headers above the oversized row.
+#[test]
+fn oversized_cant_split_row_starts_below_headers_on_the_first_fresh_page() {
+    for headers in [1, 2] {
+        let (layout, rows) = at_least_rows(648.0, headers + 1, |table| {
+            for row in table.rows.iter_mut().take(headers) {
+                row.props.header = true;
+                row.props.height = Some(64.0);
+                row.props.height_rule = HeightRule::AtLeast;
+            }
+            table.rows[headers].props.cant_split = true;
+            table.rows[headers].cells[0].blocks = lines_in_cell(80, "Synthetic");
+        });
+        let pages = assert_complete_row(&layout, 0, headers as u32, 80);
+        assert_eq!(pages.first(), Some(&0), "do not leave an initial header-only page");
+        for page in &pages {
+            assert_eq!(rows[*page], (0..=headers).collect::<Vec<_>>(), "repeat every header with body content");
+        }
+    }
+}
+
+/// Headers at a mid-page continuous section move with their oversized first body row.
+#[test]
+fn continuous_section_does_not_leave_repeated_headers_stranded() {
+    let layout = continuous_section_table(80, true);
+    let rows = at_least_rows_pages(&layout);
+    assert!(rows[0].is_empty(), "the header must move with its body: {rows:?}");
+    let pages = assert_complete_row(&layout, 1, 1, 80);
+    assert_eq!(pages.first(), Some(&1));
+    assert!(pages.iter().all(|page| rows[*page] == [0, 1]));
 }

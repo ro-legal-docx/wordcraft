@@ -166,7 +166,7 @@ pub(crate) fn place_table(ctx: &mut Ctx, pb: &mut PageBuilder, t: &wordcraft_doc
     // after them can't start under them there, the table starts on the next page.
     let first = header_rows.len();
     if !header_rows.is_empty()
-        && !pb.at_top()
+        && !pb.fresh()
         && let Some(row) = tl.rows.get(first)
     {
         let room = pb.bottom - pb.y - tl.rows.iter().take(first).map(|r| r.height).sum::<f32>();
@@ -176,7 +176,7 @@ pub(crate) fn place_table(ctx: &mut Ctx, pb: &mut PageBuilder, t: &wordcraft_doc
         }
     }
     // For the move-on rule, the table's own header rows at the top of a page leave it empty.
-    let table_at_top = pb.at_top();
+    let table_at_fresh = pb.fresh();
     for (ri, row) in tl.rows.iter().enumerate() {
         // Word never splits a row of an exact height: it moves on whole.
         let splittable = !header_rows.contains(&ri)
@@ -194,8 +194,9 @@ pub(crate) fn place_table(ctx: &mut Ctx, pb: &mut PageBuilder, t: &wordcraft_doc
         let mut rest: Option<table::RowLayout> = None;
         // On a new page holding only the repeated header rows.
         let mut fresh = false;
-        // Nothing but this table's header rows above it on a page it started at the top of.
-        let under_top_headers = ri == first && table_at_top;
+        // Capture physical freshness before the headers: a continuous section's top may be
+        // midway down a page, while headers consume an otherwise fresh page's top.
+        let under_fresh_headers = ri == first && table_at_fresh;
         // Each pass places the part of the row that fits, then breaks the page.
         for _ in 0..1000 {
             let cur = rest.as_ref().unwrap_or(row);
@@ -222,8 +223,8 @@ pub(crate) fn place_table(ctx: &mut Ctx, pb: &mut PageBuilder, t: &wordcraft_doc
             // An at-least row with less room than its minimum moves on whole, unless nothing
             // is above it on this page (moving on would gain nothing).
             let room = pb.bottom - pb.y;
-            let moves_on = rest.is_none() && !pb.at_top() && !fresh && !under_top_headers && short_of_min(ri, room);
-            let can_split = splittable || (oversized_cant_split && (pb.at_top() || fresh));
+            let moves_on = rest.is_none() && !pb.fresh() && !fresh && !under_fresh_headers && short_of_min(ri, room);
+            let can_split = splittable || (oversized_cant_split && (pb.fresh() || fresh || under_fresh_headers));
             let split = if can_split && !moves_on && !defer_kept { table::split_row(cur, room) } else { None };
             match split {
                 Some((a, b)) => {
@@ -233,7 +234,7 @@ pub(crate) fn place_table(ctx: &mut Ctx, pb: &mut PageBuilder, t: &wordcraft_doc
                 }
                 // Like Word, a row that does not fit on an empty page, or under the header rows
                 // repeated there, is placed anyway and runs into the bottom margin.
-                None if pb.at_top() || fresh => break,
+                None if pb.fresh() || fresh => break,
                 None => {}
             }
             pb.advance(block, body_top);

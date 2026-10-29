@@ -646,6 +646,7 @@ Footer page-table height and body wrapping are corrected. Other pagination gaps 
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-29 | minor | Review follow-up for #4736: distinguish a physically fresh page from a mid-page continuous-section top, and keep repeated headers with the first oversized body fragment; synthetic regression coverage added. |
 | 2026-10-29 | minor | Oversized automatic/minimum-height cantSplit rows start on a fresh page and continue without clipping (#4736); fitting rows, repeated header rows and exact-height clipping retain their contracts. Native synthetic Word Mac 16.114.2 reference; readiness estimates unchanged. |
 | 2026-10-22 | trivial | Progress log: one native window per open document |
 | 2026-10-22 | trivial | Progress log: every open document keeps its own recovery copy |
