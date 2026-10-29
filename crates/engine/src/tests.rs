@@ -8058,7 +8058,7 @@ const PORTUGUESE_TEST_AFF: &str =
 const PORTUGUESE_TEST_DIC: &str = "11\nsaudade\ncoração\ne\nele\ndisse\nnão\né\nque\nseja\nfrequencia/F\nmuito\n";
 
 const ROMANIAN_TEST_AFF: &str = "SET UTF-8\nTRY abcdefghijklmnoprsștțuvzăâî\nMAP 3\nMAP aăâ\nMAP sș\nMAP tț\n";
-const ROMANIAN_TEST_DIC: &str = "6\ndocumentul\neste\natașat\ncererea\nmare\nexemplu\n";
+const ROMANIAN_TEST_DIC: &str = "22\ndocumentul\neste\natașat\ncererea\nmare\nexemplu\ninstanta\ninstanța\nde\njudecată\npersoana\nare\ncalitatea\nparat\npârât\nparatul\npârâtul\na\ndepus\nîntâmpinare\natacul\nfost\n";
 
 /// #1063: File › Options › Proofing › Dictionaries folder. A folder of Hunspell files is saved,
 /// searched first and reported per language; a missing folder or a relative path is refused and
@@ -11123,5 +11123,42 @@ fn romanian_office_proofing_commands() {
     // Adding an unfamiliar word is available without turning off Romanian proofing.
     run(&mut s, "document.setText", json!({"text":"Exemplusintetic."}));
     run(&mut s, "review.addToDictionary", json!({"word":"exemplusintetic"}));
+    assert!(run(&mut s, "review.issues", json!({})).as_array().unwrap().is_empty());
+}
+
+/// Dictionary-valid ASCII words still receive a narrow contextual grammar suggestion.
+#[test]
+fn romanian_contextual_proofing_commands() {
+    wordcraft_proof::ro::install_dictionary(ROMANIAN_TEST_AFF, ROMANIAN_TEST_DIC).unwrap();
+    let mut s = s();
+    let source = "Instanta de judecată. Persoana are calitatea de parat. Atacul a fost parat.";
+    run(&mut s, "document.setText", json!({"text":source}));
+    run(&mut s, "select.all", json!({}));
+    run(&mut s, "review.language", json!({"lang":"ro-RO", "default":true}));
+    let issues = run(&mut s, "review.issues", json!({}));
+    let found = issues.as_array().unwrap();
+    assert_eq!(found.len(), 2, "{issues}");
+    assert!(found.iter().all(|i| i["kind"] == "grammar" && i["lang"] == "ro"), "{issues}");
+    assert_eq!(text(&s), source, "querying does not edit text");
+    run(&mut s, "caret.docStart", json!({}));
+    let first = run(&mut s, "review.spelling", json!({}));
+    assert_eq!(first["text"], "Instanta");
+    assert_eq!(first["suggestions"], json!(["Instanța"]));
+    run(&mut s, "review.applySuggestion", json!({"text":"Instanța"}));
+    assert!(text(&s).starts_with("Instanța de judecată."));
+    run(&mut s, "edit.undo", json!({}));
+    assert_eq!(text(&s), source);
+    run(&mut s, "edit.redo", json!({}));
+    run(&mut s, "caret.docStart", json!({}));
+    let second = run(&mut s, "review.spelling", json!({}));
+    assert_eq!(second["text"], "parat");
+    assert_eq!(second["suggestions"], json!(["pârât"]));
+    run(&mut s, "review.applySuggestion", json!({"text":"pârât"}));
+    assert_eq!(text(&s), "Instanța de judecată. Persoana are calitatea de pârât. Atacul a fost parat.");
+    assert!(run(&mut s, "review.issues", json!({})).as_array().unwrap().is_empty());
+    // Ignore All dismisses a contextual finding, too; the valid verb stays unchanged.
+    run(&mut s, "document.setText", json!({"text":"Paratul a depus întâmpinare."}));
+    assert_eq!(run(&mut s, "review.issues", json!({})).as_array().unwrap().len(), 1);
+    run(&mut s, "review.ignoreAll", json!({"word":"paratul"}));
     assert!(run(&mut s, "review.issues", json!({})).as_array().unwrap().is_empty());
 }

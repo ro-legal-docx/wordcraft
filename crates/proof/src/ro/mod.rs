@@ -14,6 +14,7 @@
 //!   anything further off.
 //! - **Grammar** ([`grammar`]): cheap, reliable rules with Romanian messages.
 
+mod context;
 pub mod grammar;
 mod suggest;
 #[cfg(test)]

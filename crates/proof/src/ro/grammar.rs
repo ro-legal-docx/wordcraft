@@ -10,6 +10,8 @@
 //!   `dl.`, `prof.`, `nr.`, `str.`), initials, ordinal numbers and ellipses, and the low opening
 //!   quote `„`.
 //! - **Doubled punctuation** (`,,`, `..`, `;;`).
+//! - **Contextual diacritics** in enumerated adjacent court phrases (`instanta de judecată`,
+//!   `în calitate de parat`), without changing ambiguous standalone words or valid verbs.
 //!
 //! Context-dependent changes (`nici un`, punctuation before `ci`/`dar`) are left alone:
 //! without grammatical analysis they misclassify valid correlative wording, nouns and office
@@ -117,13 +119,26 @@ fn spaces(text: &str, v: &mut Vec<Issue>) {
     }
 }
 
-fn sentence_capitals(text: &str, ws: &[(usize, usize)], capital_first: bool, v: &mut Vec<Issue>) {
+fn sentence_capitals(text: &str, ws: &[(usize, usize)], capital_first: bool, contextual: &mut [Issue], v: &mut Vec<Issue>) {
     let mut after_end = capital_first;
+    // Contextual fixes are in word order. Advance once through them, not a scan per sentence.
+    let mut fixes = contextual.iter_mut().peekable();
     for (k, (a, b)) in ws.iter().enumerate() {
         let Some(w) = text.get(*a..*b) else { continue };
+        while fixes.peek().is_some_and(|i| i.start < *a) {
+            fixes.next();
+        }
         if after_end && w.chars().next().is_some_and(char::is_lowercase) && w.chars().all(char::is_alphabetic) {
-            let fixed: String = w.chars().next().map(|f| f.to_uppercase().chain(w.chars().skip(1)).collect()).unwrap_or_default();
-            v.push(issue(*a, *b, "Majusculă la început de propoziție".into(), vec![fixed]));
+            let capital = |word: &str| word.chars().next().map(|f| f.to_uppercase().chain(word.chars().skip(1)).collect()).unwrap_or_default();
+            if let Some(fix) = fixes.peek_mut().filter(|i| i.start == *a && i.end == *b) {
+                // A contextual diacritic fix on this same word also needs the initial capital:
+                // offer `Instanța` once, rather than competing `Instanta` / `instanța` marks.
+                for suggestion in &mut fix.suggestions {
+                    *suggestion = capital(suggestion);
+                }
+            } else {
+                v.push(issue(*a, *b, "Majusculă la început de propoziție".into(), vec![capital(w)]));
+            }
         }
         // Only the gap up to the next word decides (`Salut. apoi`: `. ` ends the sentence).
         let next = ws.get(k + 1).map_or(text.len(), |n| n.0);
@@ -160,8 +175,11 @@ pub fn check_with(text: &str, capital_first: bool) -> Vec<Issue> {
     let mut v = Vec::new();
     repeated_words(text, &ws, &mut v);
     spaces(text, &mut v);
-    sentence_capitals(text, &ws, capital_first, &mut v);
+    let mut contextual = Vec::new();
+    super::context::check(text, &ws, &mut contextual);
+    sentence_capitals(text, &ws, capital_first, &mut contextual, &mut v);
     doubled_punctuation(text, &mut v);
+    v.extend(contextual);
     v.sort_by_key(|i| (i.start, i.end));
     v
 }
@@ -242,5 +260,97 @@ mod tests {
         // and the allowed `puțin puțin` is allowed in either spelling.
         assert_eq!(messages("Merg la şcoală școală."), ["Cuvânt repetat: „școală”"]);
         assert!(check("Mai stai puţin puţin.").is_empty());
+    }
+
+    #[test]
+    fn contextual_diacritics_recognize_specific_court_phrases() {
+        for (text, wrong, fixed) in [
+            ("Instanta de judecată a stabilit termenul.", "Instanta", "Instanța"),
+            ("Instanta de apel a stabilit termenul.", "Instanta", "Instanța"),
+            ("Ne adresăm instantei de recurs.", "instantei", "instanței"),
+            ("Cererea se află pe rolul instantei.", "instantei", "instanței"),
+            ("Ne prezentăm în fața instantei.", "instantei", "instanței"),
+            ("Persoana are calitatea de parat.", "parat", "pârât"),
+            ("Persoana figurează în calitate de parat.", "parat", "pârât"),
+            ("Cererea se judecă în contradictoriu cu paratul.", "paratul", "pârâtul"),
+            ("Reclamantul și paratul au fost citați.", "paratul", "pârâtul"),
+            ("Paratul a depus întâmpinare.", "Paratul", "Pârâtul"),
+            ("Se solicită citarea paratului.", "paratului", "pârâtului"),
+            ("Se solicită obligarea paratului.", "paratului", "pârâtului"),
+        ] {
+            let found: Vec<_> = check(text).into_iter().filter(|i| i.message.starts_with("Diacritice în context juridic:")).collect();
+            assert_eq!(found.len(), 1, "{text}: {found:?}");
+            let i = &found[0];
+            assert_eq!(text.get(i.start..i.end), Some(wrong), "{text}");
+            assert_eq!(i.suggestions, [fixed], "{text}");
+            assert_eq!(i.kind, IssueKind::Grammar);
+            assert_eq!(i.lang, ProofLang::Ro);
+        }
+    }
+
+    #[test]
+    fn contextual_diacritics_leave_other_senses_and_literals_alone() {
+        for text in [
+            "Portarul a parat lovitura.",
+            "Sportivul a parat atacul.",
+            "Atacul a fost parat.",
+            "A parat de fiecare dată.",
+            "Este cafea instant.",
+            "Textul de probă: instanta.",
+            "Textul de probă: parat.",
+            "Instanta se inițializează.",
+            "Instanta de apelare a funcției este separată.",
+            "Instanța de judecată a stabilit termenul.",
+            "Persoana are calitatea de pârât.",
+            "Exemplu: instanta_de_judecată.",
+            "Exemplu_instanta de judecată.",
+            "Exemplu: instanta.de.judecată.",
+            "Exemplu: https://example.invalid/instanta/de/judecată.",
+            "Se folosește «instanta» de judecată ca exemplu.",
+            "În exemplu, `instanta de judecată` este text literal.",
+            "Textul menționează calitate de «parat».",
+            "Instanta. De judecată se discută separat.",
+            "Instanta\nde judecată este pe două linii.",
+            "Se discută despre calitate de. Parat este alt cuvânt.",
+        ] {
+            let found: Vec<_> = check(text).into_iter().filter(|i| i.message.starts_with("Diacritice în context juridic:")).collect();
+            assert!(found.is_empty(), "{text}: {found:?}");
+        }
+    }
+
+    #[test]
+    fn contextual_diacritics_keep_case_unicode_offsets_and_whitespace() {
+        use unicode_normalization::UnicodeNormalization;
+        for (text, wrong, fixed) in [
+            ("INSTAnta de judecată.", "", ""),
+            ("INSTANTA DE JUDECATĂ.", "INSTANTA", "INSTANȚA"),
+            ("Ne prezentăm în faţa instantei.", "instantei", "instanței"),
+            ("Reclamantul şi paratul au fost citați.", "paratul", "pârâtul"),
+            ("Cererea este pe\u{a0}rolul\u{a0}instantei.", "instantei", "instanței"),
+        ] {
+            let source: String = text.nfd().collect();
+            let found: Vec<_> = check(&source).into_iter().filter(|i| i.message.starts_with("Diacritice în context juridic:")).collect();
+            if wrong.is_empty() {
+                assert!(found.is_empty(), "{source}: {found:?}");
+                continue;
+            }
+            assert_eq!(found.len(), 1, "{source}: {found:?}");
+            assert_eq!(source.get(found[0].start..found[0].end), Some(wrong));
+            assert_eq!(found[0].suggestions, [fixed]);
+        }
+    }
+
+    #[test]
+    fn contextual_diacritics_merge_sentence_capitals_but_keep_list_fragments() {
+        let text = "instanta de judecată a stabilit termenul.";
+        let found = check(text);
+        assert_eq!(found.len(), 1, "{found:?}");
+        assert_eq!(found[0].suggestions, ["Instanța"]);
+        let fragment = check_with(text, false);
+        assert_eq!(fragment.len(), 1, "{fragment:?}");
+        assert_eq!(fragment[0].suggestions, ["instanța"]);
+        let next = check("Salut. instanta de judecată a stabilit termenul.");
+        assert_eq!(next.len(), 1, "{next:?}");
+        assert_eq!(next[0].suggestions, ["Instanța"]);
     }
 }

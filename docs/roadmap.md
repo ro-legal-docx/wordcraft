@@ -1,6 +1,6 @@
 # WordCraft roadmap: milestones and what's next
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-28 · **Change:** minor (M15: Romanian proofing refresh from #2565; readiness estimates unchanged) · **Target:** Microsoft Word (Microsoft 365) for Mac 16.113.4
+> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-29 · **Change:** minor (Narrow Romanian contextual diacritics for court phrases; manual suggestions and synthetic regressions; estimates unchanged) · **Target:** Microsoft Word (Microsoft 365) for Mac 16.113.4
 
 Forward-looking plan. The summary is [`ROADMAP.md`](../ROADMAP.md); the ranked work list is
 [`gaps.md`](gaps.md); the numbers are in [`target-app-parity.md`](target-app-parity.md). Hours are
@@ -43,6 +43,8 @@ every day, checked end to end on the main platform (macOS desktop), including sa
 **Result: passes.** Every core workflow completes on macOS and the work saves and reopens; the
 partial rows are fidelity gaps (beta work), not broken workflows. WordCraft stays **alpha**.
 
+Romanian proofing now also offers narrow contextual diacritic suggestions in adjacent court phrases; ambiguous uses remain unmarked. This does not change readiness estimates or add full grammar analysis.
+
 ## Milestones
 
 | # | Milestone | State | Remaining |
@@ -74,6 +76,7 @@ languages, screen-reader access, ecosystem decisions (VBA, add-ins, cloud), an i
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-29 | minor | Narrow Romanian contextual diacritics for court phrases; manual suggestions and synthetic regressions; estimates unchanged |
 | 2026-10-28 | minor | M15 includes Romanian runtime dictionary, diacritic suggestions and basic checks; current UI integration and synthetic validation; no readiness estimate change |
 | 2026-10-25 | trivial | egui 0.37 migration: 27 interface languages remain pinned by `craft-i18n.rev` (9205108…); input-method surrounding-delete and commit handling has synthetic regressions only, with managed CI passing; native acceptance (#155–#164) and native-speaker review remain open |
 | 2026-10-18 | trivial | M6: Manage Sources imports Word's `Sources.xml` (#2640) |
