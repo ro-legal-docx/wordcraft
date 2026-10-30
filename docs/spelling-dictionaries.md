@@ -1,6 +1,6 @@
 # Installing spelling dictionaries
 
-> **Last reviewed:** 2026-10-16 · **Last updated:** 2026-10-29 · **Change:** minor (Narrow Romanian contextual diacritics for court phrases; manual suggestions and synthetic regressions; estimates unchanged)
+> **Last reviewed:** 2026-10-16 · **Last updated:** 2026-10-30 · **Change:** minor (repeatable Romanian external-dictionary qualification; previously minor: narrow Romanian contextual diacritics for court phrases)
 
 English spelling works out of the box. Polish, Russian, Portuguese, Czech, Italian, Croatian,
 Turkish, Indonesian, Spanish and Romanian spelling use a standard **Hunspell** dictionary (an `.aff` and a `.dic` file) that
@@ -174,10 +174,31 @@ changes the document. `a parat lovitura`, words mentioned without these cues, an
 unaccented words such as `fata` are not forced into another word. Other contexts, broader
 inflections (including ambiguous feminine forms), and Romanian hyphenation remain unsupported.
 
+### Testing an external Romanian dictionary
+
+The normal test suite uses original synthetic dictionary fixtures and needs no downloads.
+The separate `romanian_dictionary` integration test qualifies a real Rospell dictionary,
+including correct everyday text, comma-below and legacy cedilla letters, decomposed Unicode,
+diacritic and hyphen suggestions, and correction byte ranges after emoji. Supply a folder
+containing `ro_RO.aff` and `ro_RO.dic` explicitly:
+
+```sh
+WORDCRAFT_ROMANIAN_TEST_DICT=/absolute/path/to/dictionaries \
+  cargo test -p wordcraft-proof --test romanian_dictionary -- --ignored --nocapture
+```
+
+In PowerShell, set `$env:WORDCRAFT_ROMANIAN_TEST_DICT` to that folder, then run the same
+`cargo test` command. The test does not download anything, change the document or write
+preferences. It fails if the requested pair is missing or unreadable; a missing dictionary
+cannot turn this qualification into a successful no-op. It is ignored in normal CI because
+the dictionary remains an external input. Record the dictionary source revision and hashes
+alongside results; suggestion ranking and accepted forms can change with the dictionary.
+
 ## Revision history
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-30 | minor | Add explicit opt-in qualification against an external Romanian dictionary; no downloaded data or network-dependent tests in normal CI |
 | 2026-10-29 | minor | Narrow Romanian contextual diacritics for court phrases; manual suggestions and synthetic regressions; estimates unchanged |
 | 2026-10-28 | minor | Romanian proofing adapted from #2565: runtime ro_RO spelling and diacritic-aware suggestions; NOSUGGEST honored; contextual grammar guesses left alone; picker, status, F7, Romanian-interface editing defaults and DOCX persistence checks; estimates unchanged |
 | 2026-10-22 | minor | Spanish (#3360, #3553): the file names for Spain, Mexico, Latin America and Uruguay and their fallbacks |
