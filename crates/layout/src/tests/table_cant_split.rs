@@ -151,3 +151,47 @@ fn continuous_section_does_not_leave_repeated_headers_stranded() {
     assert_eq!(pages.first(), Some(&1));
     assert!(pages.iter().all(|page| rows[*page] == [0, 1]));
 }
+
+/// A fresh page's usable space includes the repeated headers; fitting rows stay whole.
+#[test]
+fn fitting_cant_split_row_stays_whole_below_repeated_headers() {
+    for room in [648.0, 200.0] {
+        for headers in [1, 2] {
+            let (layout, rows) = at_least_rows(room, headers + 1, |table| {
+                for row in table.rows.iter_mut().take(headers) {
+                    row.props.header = true;
+                    row.props.height = Some(64.0);
+                    row.props.height_rule = HeightRule::AtLeast;
+                }
+                table.rows[headers].props.cant_split = true;
+                table.rows[headers].cells[0].blocks = lines_in_cell(20, "Synthetic");
+            });
+            let expected = usize::from(room < 648.0);
+            assert_eq!(assert_complete_row(&layout, expected as u32, headers as u32, 20), vec![expected]);
+            assert_eq!(rows[expected], (0..=headers).collect::<Vec<_>>());
+            if expected > 0 {
+                assert!(rows[0].is_empty(), "headers move with a fitting cantSplit row");
+            }
+        }
+    }
+}
+
+/// Repeating headers can make a row oversized even if the same row fits on a blank page.
+#[test]
+fn repeated_headers_count_toward_the_fresh_page_budget() {
+    let (plain, _) = at_least_rows(648.0, 1, |table| {
+        table.rows[0].props.cant_split = true;
+        table.rows[0].cells[0].blocks = lines_in_cell(40, "Synthetic");
+    });
+    assert_eq!(assert_complete_row(&plain, 0, 0, 40), vec![0]);
+    let (with_headers, rows) = at_least_rows(648.0, 2, |table| {
+        table.rows[0].props.header = true;
+        table.rows[0].props.height = Some(128.0);
+        table.rows[0].props.height_rule = HeightRule::AtLeast;
+        table.rows[1].props.cant_split = true;
+        table.rows[1].cells[0].blocks = lines_in_cell(40, "Synthetic");
+    });
+    let pages = assert_complete_row(&with_headers, 0, 1, 40);
+    assert_eq!(pages, vec![0, 1], "do not emit a header-only page when no page can hold the row whole");
+    assert!(pages.iter().all(|page| rows[*page] == [0, 1]));
+}
