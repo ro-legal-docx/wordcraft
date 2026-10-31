@@ -1,6 +1,6 @@
 # Typing parity with Word
 
-> **Last reviewed:** 2026-10-11 · **Last updated:** 2026-10-28 · **Change:** minor (style-inherited list levels, direct-indent resets and synthetic DOCX save/reopen checks) · **Target:** Microsoft Word (Microsoft 365) for Mac 16.113.4
+> **Last reviewed:** 2026-10-11 · **Last updated:** 2026-10-31 · **Change:** minor (#4723: hanging first-line tab alignment and ordinary indentation of explicitly cancelled lists, checked on six synthetic native Word for Mac controls; readiness unchanged); previously trivial (Relative font-size commands preserve mixed sizes in the selection (#4903); existing button steps and one-point shortcuts are unchanged; readiness estimates unchanged); previously trivial (highlight at a caret leaves the word alone, #4086); previously trivial (Arabic Backspace removes one combining mark and keeps its base letter (#4757); previously trivial: `*Bold* and _italic_ as real formatting` in AutoFormat As You Type; previously trivial: highlight target includes selected paragraph marks, #4085; previously trivial: full-target highlight check beyond 10,000 runs, #4085; previously trivial: queued IME replacements are rejected before mutation after their marked composition loses its body/equation target; previously trivial: the transactional equation delete proves its commit with the engine revision; previously trivial: a refused byte-counted equation deletion drops only the immediately adjacent stale replacement, so a later direct commit still applies; previously trivial: a tracked own-insertion shifts the rest of a two-sided IME deletion; previously trivial: AutoCorrect/AutoFormat classification compares the actual paragraph; previously trivial: a replaced body starts a new input-method context and interrupts the composition; a quote the engine leaves as typed is the input method's own change; equation `DeleteSurrounding` erases counted characters; previously trivial: AutoCorrect finds the word after a no-break space or an ideographic space; previously trivial: a command that changes nothing is not an edit: no undo step, no unsaved changes, no relayout, and the redo stack survives it; previously trivial: while an input method composes, the caret and its candidate window sit at the input method's cursor inside the composition; previously trivial: Ctrl+Tab types a tab in a table cell, #3137; previously trivial: List AutoFormat triggers in front of an already-written paragraph, not only a fresh empty one, checked in Word for Windows, #3352; previously trivial: AltGr types its characters without opening KeyTips on Linux, #2388; previously trivial: Delete on whole selected cells leaves one empty paragraph in each, with the cell's last paragraph's formatting; nested tables go too, #2802; previously trivial: Bullets and Numbering toggle off style-inherited lists at their effective level, including basedOn chains and numbered ListParagraph styles; other paragraphs and list definitions stay unchanged (related to #3459); previously trivial: a text box that keeps the keyboard no longer resets the input method every frame, #2986; previously trivial: a slash opening a word travels whole to the next line, #2963; previously trivial: typing over a selection takes the first selected character's formatting, also when the selection was made right to left, #2879; previously trivial: Turkish and Azerbaijani case mapping in AutoCorrect, #1923; previously trivial: smart quotes in Hebrew pinned: logical order, ” in acronyms as in Word, #1670; previously trivial: Backspace on a selected table, rows or columns deletes them, Delete clears them, #1844; previously trivial: typed text takes its direction from its own letters, #1543; previously trivial: an input method's request to erase text around the caret is honoured, so web typing in Cyrillic and other non-Latin text no longer repeats, #1480; previously trivial: `-->` AutoCorrect replacement, #2223; previously trivial: a heading-list preset keeps Heading styles and makes other paragraphs Heading 1, as in Word, #1793; previously trivial: numbered headings: a heading-linked Multilevel List numbers new headings by their style; numbering keeps a heading a heading, #1793; previously trivial: reversing an automatic capital adds an exception, #1857; previously trivial: smart quotes open after guillemets and low quotes and nest; previously trivial: Enter on an empty list item numbered by its paragraph style moves it up a level, #2143; previously trivial: Backspace after a section break and Delete before it remove the break, also on the last paragraph, #2127; previously trivial: a table inserted in right-to-left text is right to left, so Tab moves left, #2634; previously trivial: Shift+Delete cuts the selection on every platform, #1669; previously trivial: Select All then Delete removes a table the document starts with, #1198; previously trivial: Alt+numpad character codes, #961; previously trivial: Down and Up from a line start beside a table go into it, #1007; previously trivial: sample-text formulas on Enter, #1067; previously trivial: Track Changes: Accept All after a tracked delete from a paragraph end keeps the next paragraph; Reject All after typing into an empty paragraph keeps it (#864); previously minor: Correct TWo INitial CApitals, cAPS LOCK and table-cell capitals, #544; previously trivial: complex-script caret and Backspace, #604; Move Paragraph Up/Down, Promote/Demote, Go Back and Alt+X keys, #343; the body IME deletion maps signed placeholder growth/shrink, keeps control markers outside the range and scopes its undo join to the matching replacement) · **Target:** Microsoft Word (Microsoft 365) for Mac 16.113.4
 
 What Word does when you type, observed black-box (same keystrokes typed into Word and
 WordCraft, results read back paragraph by paragraph) and pinned by tests in
@@ -12,11 +12,27 @@ overall picture is in [`target-app-parity.md`](target-app-parity.md).
 
 Change List Level, Indent and Outdent resolve the effective list through style inheritance.
 A real level change sets a paragraph override for that same list and clears direct physical
-and character-unit left/first-line indents. Same-level, boundary and explicit numbering-cancel
-cases remain no-ops. This adapts #4322's direct-indent fix to the current module split and
-extends it to style-based lists. Synthetic controls cover undo/redo, DOCX save/reopen and ten
-original one-page CLI cases. Their PDF renders match separately authored reference documents;
-this is not native Microsoft Word or Windows GUI acceptance. Readiness estimates are unchanged.
+and character-unit left/first-line indents. Unchanged levels and list-level boundaries remain
+no-ops. Change List Level also leaves an explicit numbering cancellation alone. Indent and
+Outdent still move a cancelled list's unnumbered text, retaining its `numId=0` override.
+This adapts #4322's direct-indent fix to the current module split and extends it to style-based
+lists. The original ten synthetic CLI cases cover history, DOCX reopening and PDF renders
+against independently authored controls; they are not native Word acceptance.
+
+The #4723 follow-up also aligns a hanging paragraph's first line, rather than its body indent,
+to the adjacent default tab stop. With 36 pt tabs, left indent 120 pt and first-line offset
+−6 pt, Increase Indent gives 150 pt and Decrease Indent gives 114 pt, retaining the −6 pt offset.
+Repeated Outdent stops at left 6 pt, with its first line at the text margin. Character-unit
+indents use the paragraph mark's size, and an explicit list cancellation drops inherited
+list-style indents as layout already does. Four command regressions cover these cases,
+including undo/redo, no-op history and DOCX reopening.
+
+All six additional synthetic controls (ordinary, cancelled and style-inherited lists, each
+with Increase/Decrease Indent) match paragraph properties saved by native Word for Mac
+16.114.3 (26102720). Their WordCraft DOCX/PDF exports preserve the text and Romanian letters.
+These are narrow property comparisons, not full visual, Windows or general Office parity.
+Word can change a shared numbering definition when Outdent is used at level zero; that behavior
+is outside this patch, which retains the existing boundary no-op. Readiness estimates are unchanged.
 
 ## Highlight shortcut (#4085)
 
@@ -30,8 +46,9 @@ The highlight decision checks the complete target, including mixed colours after
 formatting-state queries retain their existing sampling limit. Fully selected paragraph marks
 (including whole cells and empty paragraphs) participate in that decision; partial text
 columns ignore marks outside the selected range. Palette state is outside document undo; the formatting itself is undoable.
-The existing selection/word/pending-caret targeting is unchanged (the separate request #4086
-is not addressed).
+Highlighting formats the selection only: with a caret, even inside a word, it sets the
+colour for what is typed next and leaves the word alone, as in Word (#4086; Bold and other
+character formats still take the word at the caret).
 
 Regressions: `highlight_shortcut_toggles_the_last_colour` and
 `highlight_toggle_handles_mixed_inherited_and_pending_formatting`. Synthetic command/key
@@ -91,6 +108,7 @@ Bullets and Numbering decide whether to toggle off from the selected paragraphs'
 | type, select some of it, type over it | two undo steps: the first ⌘Z brings the selected text back (still selected), the second removes the typing. Uninterrupted typing stays one step | `typing_then_selecting_then_typing_are_two_undo_steps` |
 | ⌘B with nothing selected, ⌘Z, type | the text isn't bold (Undo takes the waiting caret formatting back too); ⌘Y brings it back | `undoing_bold_at_the_caret_turns_bold_typing_off_again` |
 | ⌫ at the start of the document, or typing nothing | nothing happens: no undo step is added, the document is not marked edited, and the redo stack survives ³ | `backspace_at_the_start_of_the_document_is_not_an_edit`, `a_command_that_changes_nothing_is_not_an_edit`, `a_no_op_command_keeps_the_redo_stack` |
+| ⌫ right after a floating shape's anchor at the paragraph start (In Front of Text, Square…) | joins the paragraph above and keeps the shape; the anchor is not a character to delete (checked in Word for Windows, #4592) | `backspace_after_a_floating_shape_anchor_joins_paragraphs_and_keeps_the_shape` |
 
 ³ Not re-observed side by side in Word for this change: Word's undo list does not grow when a
 key changes nothing, and the document is not marked edited. The gap was found by the read-only
@@ -367,6 +385,15 @@ again.
 
 ## Complex scripts
 
+- Arabic Backspace removes the last stored nonspacing mark, including harakat and Quranic marks,
+  without deleting its base letter (#4757). Multiple marks are removed in stored order, with no
+  normalization or decomposition. Left/Right and forward Delete keep whole-cluster behavior;
+  Latin accents, emoji and the existing Brahmic policy retain their behavior. Original synthetic
+  command regressions cover deletion, replacement, Undo/Redo and controls
+  (`arabic_backspace_removes_one_mark_and_keeps_the_base`,
+  `arabic_backspace_uses_stored_mark_order_but_delete_keeps_the_cluster`). Native keyboard and
+  Microsoft Word behavior have not been observed for this change.
+
 - Myanmar, Khmer and the Indic scripts are typed in memory order (consonant, medials, then
   vowel signs such as ေ, which is drawn before its consonant); the caret steps over whole
   syllables (Myanmar vowel signs and stacked consonants never split off), Backspace removes one
@@ -498,11 +525,31 @@ again.
   them short, read the document back to verify, and ask first. Screenshots of Word's window only,
   under `plan/word/screenshots/`.
 
+## Relative font-size changes
+
+Increase/Decrease Font Size and the one-point shortcuts transform each selected
+run from its own resolved size, including paragraph and character style inheritance
+(#4903). The existing button steps are unchanged: 20 pt and 10 pt become 22 pt and
+10.5 pt with Increase Font Size; Grow Font 1 Point makes them 21 pt and 11 pt.
+Both commands continue to set normal and complex-script sizes explicitly. Whole-body
+selections visit the selected paragraph paths once, without repeated prefix scans.
+
+Partial selections leave surrounding text and paragraph marks alone; fully selected
+paragraphs include their marks. Column pieces, selected cells, text-box frames and
+the existing word-at-caret/pending-typing targets retain their behavior. Each
+command is one Undo step and still obeys editing protection and the 1–1638 pt
+limits. Original-fixture engine and Linux CLI/headless UI save/reopen checks cover
+this correction; native Windows interaction and Microsoft Word remain untested.
+
 ## Revision history
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-31 | minor | #4723: hanging first-line tab alignment and explicit list-cancellation indentation; six synthetic native Word for Mac property controls, history/character-unit/DOCX regressions; list-definition boundary edits and general Office parity remain unclaimed |
 | 2026-10-28 | minor | Style-inherited list level changes, direct-indent reset and no-op boundaries; original synthetic DOCX/PDF controls (builds on #4322, related #4287) |
+| 2026-10-29 | trivial | Relative font-size commands preserve mixed sizes in the selection (#4903); existing button steps and one-point shortcuts are unchanged; readiness estimates unchanged |
+| 2026-10-28 | trivial | Highlighting at a caret leaves the word alone and sets the colour for what is typed next (#4086). |
+| 2026-10-28 | trivial | Arabic Backspace removes one combining mark and keeps its base letter (#4757); stored mark order, caret/forward-Delete and other-script behavior retained; original synthetic command/history/protection/save-reopen checks, no native Word comparison; readiness estimates unchanged |
 | 2026-10-25 | trivial | Highlight decisions include fully selected paragraph marks in whole cells and ordinary ranges, including empty paragraphs; partial text columns exclude unselected marks (#4085). |
 | 2026-10-25 | trivial | Highlight toggle checks the full target beyond 10,000 runs without collecting resolved formatting; mixed and inherited tails and Undo/Redo covered (#4085). |
 | 2026-10-24 | trivial | Input methods: reject queued old-composition replacements before mutation after body/equation target replacement (new regression validation pending); equation `DeleteSurrounding` is one transactional command whose checked revision proves a receipt; a caret-only step in a mixed request refuses the whole deletion, and an over-cap request clears the painted pre-edit and the previous replacement join; a refused byte-counted equation deletion drops only the immediately adjacent stale replacement, never a later direct commit; a tracked own-insertion shifts the following range; a body deletion maps signed placeholder growth/shrink, keeps control markers outside the range and scopes its replacement undo join to the matching `text.insert`; refusals clear the painted pre-edit and joins; AutoCorrect/AutoFormat classification compares the paragraph as typed; equation replacement interrupts the composition |
@@ -562,7 +609,9 @@ again.
 | 2026-10-11 | minor | Names of days capitalised; AutoCorrect Options (user entries, deleted built-ins, exceptions, every AutoCorrect/AutoFormat switch) change typing (#412) |
 | 2026-10-11 | minor | Editing keys: Move Paragraph Up/Down, Promote/Demote, Go Back (Shift+F5), Alt+X (#343) |
 | 2026-10-11 | minor | Hyperlinks: text typed at either end of a link or after Enter stays outside it (#413) |
-| 2026-10-10 | trivial | Status line, revision history and cross-links added (progress-docs standard) |
+| 2026-10-10 | trivial | Status line, revision history and cross-links added |
 | 2026-10-10 | minor | Track Changes rows: tracked Enter, Backspace and Delete on paragraph marks (#244) |
 | 2026-10-10 | major | First version: lists, AutoCorrect and AutoFormat as you type, observed against Word (#204) |
 | 2026-10-15 | trivial | Text direction: typed and inserted text takes its direction from its own letters, not the caret's run; spaces typed into reopened Hebrew draw in the Latin font until reopened (#1543) |
+
+| 2026-10-27 | trivial | Backspace after a floating shape's anchor at a paragraph start joins paragraphs and keeps the shape (#4592) |
