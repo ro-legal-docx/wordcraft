@@ -1,0 +1,20 @@
+name: Codex WordCraft office corpus verification
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  gate:
+    uses: storytold/craft-common-actions/.github/workflows/gate.yml@main
+    with:
+      packages: >-
+        pkg-config libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev
+        libgtk-3-dev libfontconfig1-dev libfreetype-dev mesa-vulkan-drivers
+      craft-fonts-ref: b076417b5880bd4154bd22f00695b1d28c6bea83
+      timeout-minutes: 45
+      command: |
+        git fetch --no-tags --depth=2 origin "$GITHUB_SHA"
+        test "$(git rev-parse HEAD^)" = "78c5a985ccc96cd7407fe790afe508f23d2ab42a"
+        test "$(git diff --name-only HEAD^ HEAD)" = ".github/workflows/codex-pr4593-verification.yml"
+        git diff --exit-code HEAD^ HEAD -- crates apps Cargo.toml Cargo.lock
+        cargo xtask ci
