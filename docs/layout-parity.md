@@ -64,8 +64,9 @@ Native Word Mac 16.114.3 (26102720) references use Helvetica Neue for every
 visible character, as do the WordCraft PDFs. Word page counts are 6/7/9/6 versus
 WordCraft 6/7/7/6. All diagnostic markers have the same page assignments in
 controls 1, 2 and 4; this does not mean pixel parity. Control 1 still strands
-headings 4 and 7 at the preceding page's bottom, and footnote marker positions in
-control 4 differ by up to 14.49 pt. In control 2, marker origins differ vertically
+headings 4 and 7 at the preceding page's bottom. In control 4, main-body content
+marker positions differ by up to 14.49 pt; footnote-marker positions differ by at
+most 0.40 pt. In control 2, marker origins differ vertically
 by at most 0.29 pt. The complex control differs materially: Word puts its heading
 alone on page 4 and its table header alone on page 5, then flows the 100 long-row
 paragraphs across pages 6–7 (57/43); WordCraft flows them across pages 4–5 (55/45).
@@ -92,6 +93,12 @@ items. Lookahead previously either omitted after-space or counted overlapping
 sides twice. Placement and lookahead now share the gap calculation, including at
 each boundary of a kept chain. Lookahead never consumes the live list counter.
 
+Lookahead does not discount multiple-spacing leading when the candidate line
+range contains a footnote, matching actual line placement. The guard also
+propagates through kept prefixes; endnotes do not occupy the footnote area. A
+fixed-font regression keeps the heading, optional middle paragraph, note-bearing
+line and footnote together, while an endnote control stays on the original page.
+
 On the independently generated six-page A4 headings/lists control, with installed
 Helvetica Neue in both applications, the unchanged native Word Mac 16.114.3
 reference has headings 4 and 7 on pages 3 and 5. Main stranded them on pages 2 and
@@ -107,9 +114,10 @@ That standalone validation did not include pending #4840's oversized-row repair.
 This combined verification branch includes both changes; the standalone results
 above remain a record of their original variant. Caption/table first-row
 budgets, manual/section breaks, floating objects, full footnote parity and native
-Windows acceptance remain separate. Six additional fixed-font tests exercise the
+Windows acceptance remain separate. Seven additional fixed-font tests exercise the
 ordinary missing-gap case, disabled controls, collapsed/additive/contextual gaps,
-automatic list spacing with numbering retained, and kept chains.
+automatic list spacing with numbering retained, kept chains, and note-bearing
+lookahead without changing endnote placement.
 
 ## Checklist
 
