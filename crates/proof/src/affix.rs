@@ -971,8 +971,13 @@ impl AffixDict {
         if self.contains_except(&w, deny) {
             return true;
         }
+        let case = casing(&w);
+        // Do not revive a listed, excluded spelling via an allowed case homograph.
+        if case != Casing::Lower && self.contains_except(&w, Mask::EMPTY) {
+            return false;
+        }
         let deny = deny | self.keepcase;
-        match casing(&w) {
+        match case {
             Casing::Lower | Casing::Mixed => false,
             Casing::Initial => self.contains_except(&w.to_lowercase(), deny),
             Casing::Upper => {
@@ -1347,6 +1352,24 @@ pub(crate) mod tests {
         for aff in ["", "NOSUGGEST N\n"] {
             let ordinary = AffixDict::from_hunspell(aff, "2\nmixCase\nhidden/N\n", &[]).unwrap();
             assert!(suggest(&ordinary, "MIXCASX", 8).contains(&"MIXCASE".into()));
+        }
+    }
+
+    /// Exact excluded spellings take precedence over an allowed case fallback.
+    #[test]
+    fn case_fallback_does_not_revive_excluded_exact_spellings() {
+        for flag in ["N", "S", "F"] {
+            let d =
+                AffixDict::from_hunspell("NOSUGGEST N\nSUBSTANDARD S\nFORBIDDENWORD F\n", &format!("3\ncaz\nCaz/{flag}\nCAZ/{flag}\n"), &[]).unwrap();
+            assert!(d.check("caz") && d.can_suggest("caz"));
+            for word in ["Caz", "CAZ"] {
+                assert_eq!(d.check(word), flag != "F", "{word}/{flag}");
+                assert!(!d.can_suggest(word), "{word}/{flag}");
+            }
+        }
+        let ordinary = AffixDict::from_hunspell("", "1\ncaz\n", &[]).unwrap();
+        for word in ["caz", "Caz", "CAZ"] {
+            assert!(ordinary.check(word) && ordinary.can_suggest(word), "unlisted case variants: {word}");
         }
     }
 
