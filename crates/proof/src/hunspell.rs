@@ -87,6 +87,11 @@ pub fn search_dirs(lo_exts: Option<&[String]>) -> Vec<PathBuf> {
                 dirs.push(base.join("hunspell"));
             }
         }
+        // Portable Windows packages may carry dictionaries beside the executable. Explorer and
+        // shortcuts can choose another working directory, so never resolve this from the cwd.
+        if let Some(dir) = std::env::current_exe().ok().and_then(|exe| exe.parent().map(|p| p.join("dictionaries"))) {
+            dirs.push(dir);
+        }
         for var in ["ProgramFiles", "ProgramFiles(x86)"] {
             if let Some(base) = std::env::var_os(var).filter(|v| !v.is_empty()).map(PathBuf::from) {
                 dirs.extend(lo_dirs(&base.join("LibreOffice").join("share").join("extensions").to_string_lossy()));
@@ -238,6 +243,29 @@ pub fn decode(aff: &[u8], dic: &[u8]) -> Result<(String, String), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A portable package needs neither a saved folder nor an environment override. Exercise
+    /// the real search path and reader with an original, tiny dictionary beside the test exe.
+    #[cfg(windows)]
+    #[test]
+    fn portable_dictionary_is_found_beside_the_executable() {
+        let exe = std::env::current_exe().unwrap();
+        let dir = exe.parent().unwrap().join("dictionaries");
+        std::fs::create_dir_all(&dir).unwrap();
+        let name = format!("portable_test_{}", std::process::id());
+        let names = [name.as_str()];
+        assert!(find(&names).is_none(), "no pair has been packaged yet");
+        let aff = dir.join(format!("{name}.aff"));
+        let dic = dir.join(format!("{name}.dic"));
+        use std::io::Write;
+        std::fs::File::create_new(&aff).unwrap().write_all(b"SET UTF-8\nSFX A Y 1\nSFX A 0 e .\n").unwrap();
+        std::fs::File::create_new(&dic).unwrap().write_all(b"1\ndocument/A\n").unwrap();
+        let (found_aff, found_dic) = find(&names).expect("the executable's dictionaries folder is searched");
+        assert_eq!((&found_aff, &found_dic), (&aff, &dic));
+        let dict = load(&found_aff, &found_dic).unwrap();
+        assert!(dict.check("document") && dict.check("documente"));
+        assert!(!dict.check("documant"));
+    }
 
     #[test]
     fn decodes_latin2_and_utf8() {
