@@ -4,18 +4,21 @@ use std::process::{Command, Output};
 
 const SCRIPT: &str = include_str!("../../packaging/macos/package.sh");
 
+/// Extract only the existing authentication decision or notarization function for a shell control.
 fn section(start: &str, end: &str) -> &'static str {
     let (_, rest) = SCRIPT.split_once(start).unwrap();
     let (part, _) = rest.split_once(end).unwrap();
     &SCRIPT[SCRIPT.len() - rest.len() - start.len()..SCRIPT.len() - rest.len() + part.len()]
 }
 
+/// Resolve Bash from the supplied search path while clearing inherited authentication variables.
 fn bash(path: &std::ffi::OsStr) -> Command {
     let mut cmd = Command::new("bash");
     cmd.env_clear().env("PATH", path);
     cmd
 }
 
+/// Exercise authentication selection and optional submission against isolated notarytool mocks.
 fn run(identity: &str, profile: bool, legacy: bool, accepted: bool, call: bool) -> Output {
     let setup = r#"
 export PATH=/usr/bin:/bin
@@ -75,6 +78,7 @@ plutil() {
 }
 
 #[test]
+/// A saved profile enables notarization with a real identity and no legacy credentials.
 fn keychain_profile_enables_notarization_without_other_apple_variables() {
     let out = run("Developer ID Application: Example", true, false, true, true);
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
@@ -82,6 +86,7 @@ fn keychain_profile_enables_notarization_without_other_apple_variables() {
 }
 
 #[test]
+/// A selected profile remains the authentication source when legacy variables are also present.
 fn keychain_profile_takes_precedence_over_legacy_variables() {
     let out = run("Developer ID Application: Example", true, true, true, true);
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
@@ -89,12 +94,14 @@ fn keychain_profile_takes_precedence_over_legacy_variables() {
 }
 
 #[test]
+/// Complete legacy authentication still submits with the same ordered arguments.
 fn legacy_authentication_remains_supported() {
     let out = run("Developer ID Application: Example", false, true, true, true);
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
 }
 
 #[test]
+/// A rejected submission retrieves its failure log through the authentication already selected.
 fn rejected_submissions_fetch_logs_with_the_same_authentication() {
     for profile in [false, true] {
         let out = run("Developer ID Application: Example", profile, !profile, false, true);
@@ -105,11 +112,13 @@ fn rejected_submissions_fetch_logs_with_the_same_authentication() {
 }
 
 #[test]
+/// A profile cannot turn ad-hoc signing into a notarized build.
 fn profile_does_not_enable_notarization_for_ad_hoc_signing() {
     assert!(run("-", true, false, true, false).status.success());
 }
 
 #[test]
+/// Missing authentication keeps a signed local build outside notarization.
 fn incomplete_authentication_keeps_notarization_disabled() {
     assert!(run("Developer ID Application: Example", false, false, true, false).status.success());
 }
