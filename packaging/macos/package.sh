@@ -99,6 +99,7 @@ stapler_retry() {
   exit 1
 }
 
+# Use validated native tickets in release CI; other stapling choices are local-only.
 staple() {
   if xcrun --find stapler >/dev/null 2>&1; then
     stapler_retry staple "$1"

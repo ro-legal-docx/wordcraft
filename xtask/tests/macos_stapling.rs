@@ -4,22 +4,26 @@ use std::process::{Command, Output};
 
 const SCRIPT: &str = include_str!("../../packaging/macos/package.sh");
 
+/// Extract an existing packaging helper or caller without running the full packaging script.
 fn section(start: &str, end: &str) -> &'static str {
     let (_, rest) = SCRIPT.split_once(start).unwrap();
     let (part, _) = rest.split_once(end).unwrap();
     &SCRIPT[SCRIPT.len() - rest.len() - start.len()..SCRIPT.len() - rest.len() + part.len()]
 }
 
+/// Start Bash with only the supplied executable search path and explicit test variables.
 fn bash(path: &std::ffi::OsStr) -> Command {
     let mut cmd = Command::new("bash");
     cmd.env_clear().env("PATH", path);
     cmd
 }
 
+/// Exercise local stapling for one synthetic container with a chosen failure count.
 fn run(tool: &str, failures: u8, dmg: bool) -> Output {
     run_in_environment(tool, failures, dmg, false)
 }
 
+/// Run the real stapling helper and caller against isolated tool mocks, optionally as CI.
 fn run_in_environment(tool: &str, failures: u8, dmg: bool, ci: bool) -> Output {
     let setup = r#"
 export PATH=/usr/bin:/bin
@@ -75,6 +79,7 @@ fi
 }
 
 #[test]
+/// Native tooling takes priority and validates tickets for both app and DMG callers.
 fn native_stapler_is_preferred_and_validates_both_containers() {
     for dmg in [false, true] {
         let out = run("native", 0, dmg);
@@ -87,6 +92,7 @@ fn native_stapler_is_preferred_and_validates_both_containers() {
 }
 
 #[test]
+/// Local fallback staples both containers while leaving native ticket validation unavailable.
 fn rcodesign_fallback_staples_without_a_validate_step() {
     for dmg in [false, true] {
         let out = run("rcodesign", 0, dmg);
@@ -99,6 +105,7 @@ fn rcodesign_fallback_staples_without_a_validate_step() {
 }
 
 #[test]
+/// Local runs without either stapling tool warn and retain the online assessment.
 fn missing_tools_warn_and_still_run_gatekeeper_assessment() {
     for dmg in [false, true] {
         let out = run("none", 0, dmg);
@@ -109,6 +116,7 @@ fn missing_tools_warn_and_still_run_gatekeeper_assessment() {
 }
 
 #[test]
+/// Both local tools retry a transient failure within the same bounded pause schedule.
 fn both_tools_retry_four_times_with_the_same_backoff() {
     for tool in ["native", "rcodesign"] {
         let out = run(tool, 3, false);
@@ -122,6 +130,7 @@ fn both_tools_retry_four_times_with_the_same_backoff() {
 }
 
 #[test]
+/// An available but failing tool stops packaging before the online assessment.
 fn persistent_stapling_errors_fail_instead_of_becoming_missing_tool_warnings() {
     for tool in ["native", "rcodesign"] {
         let out = run(tool, 4, false);
@@ -132,6 +141,7 @@ fn persistent_stapling_errors_fail_instead_of_becoming_missing_tool_warnings() {
 }
 
 #[test]
+/// Release CI rejects every local-only fallback and accepts native staple plus validation.
 fn release_ci_requires_native_stapling_and_validation() {
     for dmg in [false, true] {
         for tool in ["none", "rcodesign"] {
