@@ -1212,7 +1212,9 @@ fn rtf_export_keeps_section_headers_and_footers() {
             .collect::<Vec<_>>()
     };
     assert_eq!(stories(&after), stories(&before));
-    assert_eq!(model::from_doc(&after).blocks.len(), model::from_doc(&before).blocks.len());
+    let after_shared = wordcraft_docx::to_shared_model(&after).unwrap();
+    let before_shared = wordcraft_docx::to_shared_model(&before).unwrap();
+    assert_eq!(model::from_doc(&after_shared).blocks.len(), model::from_doc(&before_shared).blocks.len());
 }
 
 /// All six section-story destinations retain their text, formatting and header tables.
