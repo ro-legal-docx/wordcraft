@@ -339,6 +339,8 @@ fn native_oversized_cant_split_header_sequence() {
 /// A reduced balancing trial cannot fragment a kept row that fits the uncapped body.
 #[test]
 fn fitting_cant_split_rows_stay_whole_when_columns_balance_at_a_continuous_break() {
+    use wordcraft_doc::props::LineSpacing;
+    use wordcraft_doc::{Paragraph, para_block};
     for header in [false, true] {
         for balance in [false, true] {
             let mut doc = pagination_fixture_document("");
