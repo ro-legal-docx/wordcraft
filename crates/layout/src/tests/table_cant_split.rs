@@ -335,3 +335,49 @@ fn native_oversized_cant_split_header_sequence() {
         }
     }
 }
+
+/// A reduced balancing trial cannot fragment a kept row that fits the uncapped body.
+#[test]
+fn fitting_cant_split_rows_stay_whole_when_columns_balance_at_a_continuous_break() {
+    for header in [false, true] {
+        for balance in [false, true] {
+            let mut doc = pagination_fixture_document("");
+            let mut two = doc.last_section.clone();
+            two.columns.count = 2;
+            two.balance_columns = Some(balance);
+            let body_row = usize::from(header);
+            let mut table = Table::new(body_row + 1, 1, 216.0);
+            if header {
+                table.rows[0].props.header = true;
+                table.rows[0].cells[0].blocks = lines_in_cell(1, "Header");
+            }
+            table.rows[body_row].props.cant_split = true;
+            table.rows[body_row].cells[0].blocks = lines_in_cell(20, "Kept");
+            set_at_least_row_spacing(&mut table);
+            let mut closing = Paragraph::with_text("Section boundary", Default::default());
+            closing.section = Some(Box::new(two));
+            closing.props.line_spacing = Some(LineSpacing::Exactly(14.0));
+            closing.props.space_before = Some(0.0);
+            closing.props.space_after = Some(0.0);
+            doc.last_section.start = SectionStart::Continuous;
+            doc.body = vec![Arc::new(Block::Table(table)), para_block(closing), para_block(Paragraph::with_text("After", Default::default()))];
+            let laid = lay(&doc);
+            assert_pagination_fixture_font(&laid);
+            assert_eq!(assert_complete_row(&laid, 0, body_row as u32, 20), vec![0]);
+            let columns: std::collections::BTreeSet<_> = laid
+                .pages
+                .iter()
+                .enumerate()
+                .flat_map(|(page, p)| {
+                    p.items.iter().filter_map(move |item| match item {
+                        Placed::Lines { story: StoryRef::Body, path, x, .. } if path.0.len() == 4 && path.0[..3] == [0, body_row as u32, 0] => {
+                            Some((page, x.round() as i32))
+                        }
+                        _ => None,
+                    })
+                })
+                .collect();
+            assert_eq!(columns.len(), 1, "header={header}, balance={balance}: a fitting kept row stays in one column: {columns:?}");
+        }
+    }
+}

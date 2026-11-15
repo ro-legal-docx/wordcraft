@@ -262,7 +262,10 @@ pub(crate) fn place_table(ctx: &mut Ctx, pb: &mut PageBuilder, t: &wordcraft_doc
         let oversized_cant_split = ri >= header_rows.len()
             && t.rows
                 .get(ri)
-                .is_some_and(|r| r.props.cant_split && !(r.props.height_rule == HeightRule::Exact && r.props.height.is_some_and(|h| h > 0.0)));
+                .is_some_and(|r| r.props.cant_split && !(r.props.height_rule == HeightRule::Exact && r.props.height.is_some_and(|h| h > 0.0)))
+            // Balancing caps `bottom` for a trial. It must not turn a fitting kept row into
+            // an oversized one: use the uncapped physical body, after repeated headers.
+            && row.height + row.edge > (pb.uncapped_bottom() - pb.page_top - repeated_height).max(0.0) + 0.01;
         // Word Mac 16.114.3: when the first cantSplit body row exceeds a whole text
         // area, its original headers get their own page. Intermediate row fragments
         // have no repeated headers; the final fragment repeats them if they fit.
