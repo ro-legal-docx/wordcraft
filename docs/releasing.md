@@ -26,3 +26,14 @@ Local packaging: `packaging/macos/package.sh --arch universal`, `packaging/windo
 Dry run: `gh workflow run release.yml --ref <branch>` builds the unsigned jobs (version, Linux,
 Linux riscv64, Flatpak, FreeBSD, web) on any branch; the signing jobs are refused there by the `release`
 environment's branch rule, so no draft release is made.
+
+## Compiled distribution label
+
+Set `WORDCRAFT_BUILD_LABEL=Preview` while compiling to identify a labelled build in
+window titles and turn off its automatic startup update check. The value is compiled
+in: setting it only when launching an existing binary has no effect. Every nonempty
+value, including whitespace, selects this policy; unset or empty values keep the
+ordinary name and startup preference. Manual update checks remain available. Release
+packaging does not set this variable or provision a separate update policy.
+
+> 2026-11-15: documented the compiled-label contract and retained the existing release defaults.
