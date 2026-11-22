@@ -39,11 +39,22 @@ pub(crate) fn show(ui: &mut Ui, _cx: &mut BodyCx<'_>, app: &mut WordApp) {
         } else {
             tl!("Not saved")
         };
-        Title::new(format!("{} — {state}", craft::i18n::file_name(&app.title_stem(), super::interface_direction())))
-            .action(tl!("Rename Document").to_string())
+        let suffix = crate::build_config::BUILD_LABEL;
+        let label = if suffix.is_empty() { String::new() } else { format!(" ({suffix})") };
+        let name = app.title_stem();
+        let shown = if label.is_empty() {
+            format!("{} — {state}", craft::i18n::file_name(&name, super::interface_direction()))
+        } else {
+            let room = app.chrome.title_room.unwrap_or(ui.available_width()).max(0.0);
+            let font = egui::TextStyle::Button.resolve(ui.style());
+            super::fitted_document_title(&name, &format!(" — {state}"), &label, room, |text| {
+                ui.painter().layout_no_wrap(text.to_owned(), font.clone(), egui::Color32::WHITE).size().x
+            })
+        };
+        Title::new(shown).action(tl!("Rename Document").to_string())
     } else {
         // No document open (#1129): the app's name alone.
-        Title::new("WordCraft")
+        Title::new(crate::build_config::app_name())
     };
     // The controls at the end give way in a narrow window (#5886): the step that fits the room the leading controls
     // left in the last pass.
@@ -72,7 +83,10 @@ pub(crate) fn show(ui: &mut Ui, _cx: &mut BodyCx<'_>, app: &mut WordApp) {
         // is the room it has, less a gap on either side of the title's place between them.
         let span = if super::interface_direction().is_rtl() { l.min.x - t.min.x } else { t.max.x - l.max.x };
         let room = span - TITLE_FIT_GAP;
-        if a.chrome.title_fit.note(step, t.width(), room) {
+        let title_room = (room - t.width()).max(0.0);
+        let title_changed = a.chrome.title_room.is_none_or(|old| (old - title_room).abs() > 0.5);
+        a.chrome.title_room = Some(title_room);
+        if a.chrome.title_fit.note(step, t.width(), room) || title_changed {
             ui.ctx().request_repaint();
         }
     }
