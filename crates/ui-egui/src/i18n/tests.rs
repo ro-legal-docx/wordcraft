@@ -368,6 +368,34 @@ fn the_flatpak_manifest_pins_the_craft_i18n_rev() {
     assert!(manifest.contains("CRAFT_I18N_DIR: /run/build/wordcraft/craft-i18n"), "the build embeds the catalogs");
 }
 
+/// A Romanian interface defaults new documents to Romanian, while respecting existing content
+/// and an explicitly saved proofing default. No user preferences are read or written here.
+#[test]
+fn romanian_interface_defaults_new_documents_to_romanian_proofing() {
+    needs_catalogs!();
+    let mut app = crate::WordApp::new(wordcraft_engine::Session::new(wordcraft_doc::Document::new()), Default::default());
+    let ctx = egui::Context::default();
+    let frame = |app: &mut crate::WordApp| ctx.run_ui(egui::RawInput::default(), |ui| app.logic(ui.ctx())).drop_without_applying_deltas();
+    app.run("ui.language", serde_json::json!({"value":"ro"})).unwrap();
+    frame(&mut app);
+    assert_eq!(app.session.editing_lang.as_deref(), Some("ro-RO"));
+    assert_eq!(app.session.doc.styles.default_chr.lang.as_deref(), Some("ro-RO"));
+    assert!(!app.session.dirty);
+    app.run("file.new", serde_json::json!({})).unwrap();
+    assert_eq!(app.session.doc.styles.default_chr.lang.as_deref(), Some("ro-RO"));
+    app.run("document.setText", serde_json::json!({"text":"Text sintetic."})).unwrap();
+    let before = serde_json::to_value(&app.session.doc).unwrap();
+    app.run("ui.language", serde_json::json!({"value":"en"})).unwrap();
+    frame(&mut app);
+    assert_eq!(serde_json::to_value(&app.session.doc).unwrap(), before);
+    app.session.prefs.default_language = Some("en-GB".into());
+    app.run("ui.language", serde_json::json!({"value":"ro"})).unwrap();
+    frame(&mut app);
+    assert_eq!(app.session.editing_lang.as_deref(), Some("en-GB"));
+    app.run("file.new", serde_json::json!({})).unwrap();
+    assert_eq!(app.session.doc.styles.default_chr.lang.as_deref(), Some("en-GB"));
+}
+
 /// A right-to-left test language whose catalog is `source`, bound as the current language.
 fn arabic_fixture(ctx: &egui::Context, source: &'static str) -> Lang {
     fixture_host(ctx, "ar", source)
