@@ -147,7 +147,9 @@ pub fn from_shared_model(source: craft_wordmodel::Document) -> Result<wordcraft_
     document.numbering = Arc::new(convert((*numbering).clone())?);
     document.comments = convert(comments)?;
     document.revisions = convert(revisions)?;
+    let compat_mode = settings.effective_compat_mode();
     document.settings = convert(settings)?;
+    document.settings.compat_mode = compat_mode;
     document.core = convert(core)?;
     document.sources = convert(sources)?;
     document.custom_props = convert(custom_props)?;
@@ -175,6 +177,7 @@ mod tests {
             ch_w: 64.0,
             ch_h: 48.0,
             children: vec![craft_wordmodel::para::GroupChild {
+                link: None,
                 x: 4.0,
                 y: 6.0,
                 obj: craft_wordmodel::para::InlineObject::Field {
@@ -202,7 +205,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        source.settings.compat_mode = 11;
+        source.settings.compat_mode = Some(11);
         let image = Arc::new(vec![0x5a; 1 << 20]);
         source.media.insert("image1.png".into(), image.clone());
 
